@@ -1,0 +1,3 @@
+# Personal config — never commit
+*.user.toml
+.claude/settings.local.json
