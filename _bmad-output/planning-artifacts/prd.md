@@ -1,5 +1,6 @@
 ---
-stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-02b-vision', 'step-02c-executive-summary', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation']
+stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-02b-vision', 'step-02c-executive-summary', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish', 'step-12-complete']
+releaseMode: phased
 inputDocuments:
   - '_bmad-output/brainstorming/brainstorming-session-2026-05-14-142342.md'
   - 'README.md'
@@ -19,7 +20,7 @@ classification:
 # Product Requirements Document - C1Pay
 
 **Author:** David
-**Date:** 2026-05-18
+**Date:** 2026-05-20
 
 ## Executive Summary
 
@@ -86,38 +87,6 @@ The enterprise training team can:
 | Concept docs | One per practice demonstrated; each cites at least one authoritative external resource |
 | Duplication | Zero duplicate logic in application code or tests |
 | Training readiness | A training session can be run end-to-end using only the codebase and its documentation layer |
-
-## Product Scope
-
-### MVP — Minimum Viable Product
-
-**Application layer:**
-- User accounts (username + password, fixed starting balance)
-- Send money (username search, amount, optional note — instant transfer)
-- Request money (username search, amount, optional note — pending inbox)
-- Request inbox (Pay / Decline actions)
-- Cancel outgoing pending requests
-- Balance-gated Pay button (disabled on insufficient funds)
-- Transaction history (flat chronological list)
-- Home screen (balance, inbox badge, Send/Request actions)
-- Real-time sync via SSE
-
-**Learning layer:**
-- ADR-style decision records for all major architectural choices
-- Concept docs for each demonstrated practice, with citations
-- Test suite structured to demonstrate the full testing pyramid (unit, integration, e2e)
-
-### Growth Features (Post-MVP)
-
-- In-app notifications (push pending requests and payment receipts)
-- Recent contacts list (reduce friction for repeat interactions)
-- Transaction filtering (All / Sent / Received)
-- Additional practice demonstrations as training program needs expand
-- Expanded concept doc library as new topics are added to training curriculum
-
-### Vision
-
-C1Pay is a living training artifact — updated continuously as software engineering practices evolve, new technologies become relevant, and the training team's curriculum grows. There is no terminal version; the codebase stays current with the state of the art the team wants to teach.
 
 ## User Journeys
 
@@ -213,17 +182,15 @@ C1Pay is a living training artifact — updated continuously as software enginee
 
 ## Domain-Specific Requirements
 
-C1Pay operates in the fintech domain by vocabulary and design pattern — not by regulatory obligation. The sandboxed architecture eliminates the compliance surface that defines real fintech products. What remains is a small set of security and integrity requirements that apply on their own merit, several of which are themselves practices being demonstrated by the codebase.
+C1Pay operates in the fintech domain by vocabulary and design pattern — not by regulatory obligation. The sandboxed architecture eliminates the compliance surface that defines real fintech products.
 
-### Security
+### Security Context
 
-- **Password hashing** — user credentials are hashed using bcrypt (or equivalent). Plaintext passwords are never stored or logged. This is both a functional requirement and a demonstrated practice.
-- **JWT integrity** — tokens are signed, carry appropriate expiry, and contain no sensitive payload data. Token validation is enforced on all protected routes. Demonstrated as a named practice with a decision record.
-- **No sensitive financial data** — the system stores no real account numbers, card numbers, or banking credentials. All balances are internal ledger values. This constraint is structural and permanent.
+Password hashing and JWT token integrity are both functional requirements and demonstrated practices. Specific measurable targets are defined in the Non-Functional Requirements section. No sensitive financial data — account numbers, card numbers, banking credentials — is stored, transmitted, or referenced anywhere in the system. All balances are internal ledger values.
 
 ### Data Integrity
 
-- **Atomic transactions** — balance debits and credits execute as a single atomic database operation. Concurrent sends cannot produce inconsistent balance states. Row-level locking is applied at the transaction boundary. This is the primary fintech-pattern technical requirement that genuinely applies to C1Pay.
+- **Atomic transactions** — balance debits and credits execute as a single atomic database operation. Concurrent sends cannot produce inconsistent balance states. Row-level locking is applied at the transaction boundary.
 - **No overdraft** — balance sufficiency is enforced at the application layer before any transaction is committed. The Pay action is disabled in the UI when balance is insufficient; a server-side check enforces this independently.
 
 ### Compliance
@@ -232,5 +199,231 @@ None applicable. C1Pay is not a financial product. It carries no KYC, AML, PCI-D
 
 ### Technical Constraints
 
-- **Local development only** — no enterprise infrastructure, no deployment security requirements, no access control beyond application-level auth. The app runs in a local dev environment for training sessions.
-- **Environment reset capability** — the batch process must be able to create, seed, and reset accounts idempotently. Training sessions depend on a clean, consistent starting state.
+- **Local development only** — no enterprise infrastructure, no deployment security requirements, no access control beyond application-level auth.
+- **Environment reset capability** — the batch process must create, seed, and reset accounts idempotently. Training sessions depend on a clean, consistent starting state.
+
+## Web Application Specific Requirements
+
+### Project-Type Overview
+
+C1Pay is a Next.js web application — a hybrid SSR/client-side app where rendering mode is chosen deliberately by route, not by default. That choice is itself a teaching moment: auth and initial page load use SSR; interactive payment screens use client-side rendering with SSE for real-time updates. The rendering strategy is a named decision with a corresponding record.
+
+### Browser Support
+
+Modern browsers only. Chrome, Firefox, and Safari at current versions. No legacy browser support. No polyfills for deprecated APIs. This is a local development and training environment — no IE, no compatibility shims.
+
+| Browser | Support |
+|---|---|
+| Chrome | Current |
+| Firefox | Current |
+| Safari | Current |
+| Legacy / IE | Not supported |
+
+### Responsive Design
+
+Responsive layout is a **demonstrated practice** — not incidental. The mobile-responsive implementation is intentional and named, with a concept doc explaining the approach (CSS strategy, breakpoints, component behavior at different viewports). The app works correctly on mobile viewport sizes. This is part of the learning layer, not just a functional checkbox.
+
+### Accessibility
+
+Accessibility is a **demonstrated practice** — implemented to WCAG AA and named in the learning layer with a concept doc. The implementation explicitly shows semantic HTML structure, ARIA roles and labels, keyboard navigation, focus management, and colour contrast compliance. A reader can study the approach and apply it. A decision record documents the accessibility strategy taken and why WCAG AA was chosen as the target level.
+
+### Real-Time Behavior
+
+SSE (Server-Sent Events) provides real-time balance and inbox updates — server-to-client only. This is a named architectural decision with a full decision record: why SSE was chosen over WebSockets (unidirectional data flow, simpler connection lifecycle, standard HTTP/2, built-in reconnection). The SSE implementation is itself a teaching artifact.
+
+### Performance Targets
+
+Local development environment — no uptime SLAs, no load targets. Performance considerations apply at the code quality level: no N+1 queries, no unnecessary re-renders, efficient SSE fan-out. Good patterns demonstrated; hard performance budgets not required for MVP.
+
+### SEO
+
+Not applicable. No public-facing pages, no marketing content, no search indexing.
+
+### Implementation Considerations
+
+- **Rendering strategy** — SSR for auth and initial load; client-side for interactive screens. Named decision with record.
+- **Real-time connection lifecycle** — SSE connections must handle browser tab visibility changes and reconnection gracefully.
+- **State management** — balance and inbox state kept in sync with server via SSE; no stale UI after a transaction completes.
+- **Form validation** — client-side validation for send/request flows (amount, username); server-side validation is the authoritative check.
+
+## Project Scoping & Phased Development
+
+### Strategy & Philosophy
+
+C1Pay ships in two phases that reflect a clear separation of concerns: first a fully working, well-tested application; then the explanation layer that makes it a complete teaching artifact. Phase 1 is shippable and useful on its own — a training facilitator can demo it and walk through the code. Phase 2 makes it self-explanatory, reducing the facilitator's burden and enabling self-directed study.
+
+Testing is a first-class citizen in Phase 1, not deferred to Phase 2. The test pyramid structure and deliberate test naming are part of the working implementation — the teaching is embedded in how the tests are organised, not in separate documentation.
+
+### Phase 1 — Working App
+
+**Goal:** A fully functional P2P payment simulator with a production-quality test suite and implemented best practices. Ready for training sessions.
+
+**Core User Journeys Supported:**
+- Facilitator running a demo session
+- App user sending money (happy path)
+- App user navigating the request flow and state machine
+- Developer trainee reading the test suite
+- Facilitator running pre-session batch setup
+
+**Must-Have Capabilities:**
+
+*Application Layer:*
+- User accounts (username + password, bcrypt hashing, JWT auth)
+- Fixed seeded starting balance
+- Send money (username search, amount, optional note, instant transfer)
+- Request money (username search, amount, optional note)
+- Request inbox (Pay / Decline)
+- Cancel outgoing pending requests
+- Balance-gated Pay button (client + server enforcement)
+- Transaction history (flat chronological list)
+- Home screen (balance, inbox badge, Send/Request actions)
+- Real-time sync via SSE (balance and inbox updates)
+- Batch admin script (account creation, balance seeding, history reset — idempotent)
+
+*Quality & Practice Layer:*
+- Test suite covering all three pyramid levels (unit, integration, e2e)
+- Deliberate test naming and organisation that surfaces the testing strategy
+- Responsive layout (mobile-first, correct at all viewport sizes)
+- Accessibility to WCAG AA (semantic HTML, ARIA, keyboard navigation, focus management, contrast)
+
+**Nice-to-Have for Phase 1:**
+- In-app notifications (badge + inbox sufficient; deferred to growth)
+- Recent contacts list (username search adequate for Phase 1)
+- Transaction filtering (flat list sufficient for Phase 1)
+
+### Phase 2 — Learning Layer
+
+**Goal:** Transform the working codebase into a complete self-documenting teaching artifact. Adds the narration, rationale, and citations that make every design decision legible without a facilitator present.
+
+**Capabilities:**
+- ADR-style decision records for all major architectural choices (auth model, SSE vs WebSockets, atomic transactions, ORM boundary, rendering strategy, test pyramid approach, accessibility strategy, responsive approach)
+- Concept docs for each demonstrated practice — naming the principle, explaining it in context, linking to authoritative external resources
+- Test suite documentation aligned with concept docs
+
+### Risk Mitigation Strategy
+
+**Technical Risks:**
+- *Row-level locking in Drizzle ORM* — the ORM abstraction leaks at the transaction boundary; raw SQL (`SELECT ... FOR UPDATE`) will likely be required. Flag this explicitly in implementation — it is itself a teaching moment about ORM limits.
+- *SSE fan-out* — notifying recipients when payments land requires either Postgres LISTEN/NOTIFY, an in-process event bus, or a polling loop. Design decision should be made early and documented.
+- *SSE reconnection* — connection lifecycle must handle tab visibility changes and network interruptions gracefully; test coverage required.
+
+**Resource Risks:**
+- Maintainer team is the training team operating on an organic backlog cadence. Phase 2 completion depends on training team bandwidth, not a fixed delivery date.
+- Phase 1 is scoped to be completable without external dependencies or infrastructure.
+
+**Market / Adoption Risks:**
+- Not applicable. Internal training tool with a captive audience. No adoption risk.
+
+## Functional Requirements
+
+This is the capability contract for C1Pay. Every capability listed here must be implemented; anything not listed will not exist in the final product.
+
+Phase 2 items are marked **(Phase 2)**.
+
+### User Authentication & Identity
+
+- **FR1:** A new user can register an account with a unique username and password
+- **FR2:** A registered user can authenticate with their username and password
+- **FR3:** An authenticated user can log out and end their session
+- **FR4:** The system enforces authenticated access to all protected routes — unauthenticated requests are rejected
+- **FR5:** User passwords are stored using a one-way cryptographic hash — plaintext passwords are never persisted or logged
+
+### Balance Management
+
+- **FR6:** A new user account is assigned a fixed starting balance at registration
+- **FR7:** An authenticated user can view their current balance
+- **FR8:** The system prevents a user from initiating any payment that would exceed their available balance
+- **FR9:** All balance changes are applied atomically — no partial updates are possible under concurrent operations
+
+### Money Movement — Send
+
+- **FR10:** An authenticated user can search for another registered user by username
+- **FR11:** An authenticated user can send money to another user by specifying an amount and an optional note
+- **FR12:** A sent payment transfers funds immediately with no pending state
+- **FR13:** Sender and recipient balances update atomically upon a completed send
+- **FR14:** A completed send is recorded in the transaction history of both the sender and recipient
+
+### Money Movement — Request
+
+- **FR15:** An authenticated user can request money from another registered user by specifying an amount and an optional note
+- **FR16:** A submitted payment request appears in the recipient's inbox in a pending state
+- **FR17:** A recipient can pay a pending request, transferring funds immediately
+- **FR18:** A recipient can decline a pending request without transferring funds
+- **FR19:** A requester can cancel their own pending request at any time before it is resolved
+- **FR20:** A resolved request (paid, declined, or cancelled) is removed from the recipient's active inbox
+- **FR21:** The outcome of a resolved request is recorded in both parties' transaction history
+- **FR22:** The system prevents a recipient from paying a request when their balance is insufficient
+
+### Activity & History
+
+- **FR23:** An authenticated user can view a chronological list of all their transactions — sends, received payments, paid requests, and declined requests
+- **FR24:** Each transaction record displays the counterparty, amount, direction, type, optional note, and timestamp
+- **FR25:** An authenticated user can view the count of their pending incoming payment requests
+
+### Real-Time Synchronisation
+
+- **FR26:** An authenticated user's balance updates in real time when funds are sent to them
+- **FR27:** An authenticated user's inbox updates in real time when a new payment request is received
+- **FR28:** An authenticated user's inbox and balance update in real time when a request they sent is resolved
+- **FR29:** The real-time connection re-establishes automatically after a network interruption
+
+### User Interface & Accessibility
+
+- **FR30:** The application is usable at mobile, tablet, and desktop viewport sizes without loss of functionality
+- **FR31:** The application meets WCAG AA accessibility standards — including semantic HTML structure, ARIA roles and labels, keyboard navigation, focus management, and colour contrast ratios
+- **FR32:** A user can complete all core flows (register, log in, send, request, pay, decline, cancel) using keyboard navigation alone
+
+### Training Environment Administration
+
+- **FR33:** An administrator can create multiple test user accounts in a single batch operation
+- **FR34:** An administrator can assign a specified starting balance to all accounts during batch setup
+- **FR35:** An administrator can reset account balances and clear transaction and request history for all test accounts
+- **FR36:** The batch administration process is idempotent — repeated execution produces the same result without duplicating or corrupting data
+
+### Test Coverage
+
+- **FR37:** The system has unit tests that verify the behaviour of individual components in isolation, without database or network dependencies
+- **FR38:** The system has integration tests that verify behaviour across component boundaries, including real database operations and transaction integrity
+- **FR39:** The system has end-to-end tests that verify complete user flows from the browser through to the database
+- **FR40:** Tests are named and organised by level so that the testing strategy — and which level each test belongs to — is legible to a reader without additional explanation
+
+### Learning Layer *(Phase 2)*
+
+- **FR41:** A reader can access a decision record for each major architectural choice made in the codebase *(Phase 2)*
+- **FR42:** Each decision record documents the options considered, the decision made, and the rationale — including the engineering principle being applied *(Phase 2)*
+- **FR43:** A reader can access a concept document for each software engineering practice demonstrated in the codebase *(Phase 2)*
+- **FR44:** Each concept document explains the practice in the context of the C1Pay implementation and links to at least one authoritative external resource for further reading *(Phase 2)*
+
+## Non-Functional Requirements
+
+### Performance
+
+C1Pay runs in a local development environment. Hard SLAs don't apply, but the demo experience must feel responsive — lag during a live training session breaks the teaching moment.
+
+- Real-time balance and inbox updates reach connected clients within 1 second of the triggering event under local network conditions
+- Page loads and route transitions complete within 2 seconds under local development
+- No N+1 query patterns — database queries do not scale linearly with result set size
+
+### Security
+
+- User passwords are hashed using bcrypt with a minimum work factor of 12
+- JWT tokens carry an explicit expiry; expired tokens are rejected on all protected routes
+- JWT token payloads contain no sensitive data beyond the user identifier
+- All protected routes reject unauthenticated requests with a 401 response — no silent failures
+- No real financial data of any kind (account numbers, card numbers, banking credentials) is stored, transmitted, or referenced anywhere in the system
+
+### Code Quality
+
+Code quality is a first-class NFR for C1Pay — the codebase is itself a teaching artifact, and quality standards are part of what it demonstrates.
+
+- No duplication of business logic — each piece of logic exists in exactly one location in the codebase
+- Unit tests cover all business logic functions; integration tests cover all database operations; e2e tests cover all user-facing flows
+- Each module is independently readable — a developer should be able to understand a module without cross-referencing unrelated files
+- No dead code, unused imports, or commented-out blocks committed to the codebase
+
+### Accessibility
+
+- The application passes WCAG 2.1 AA automated checks — zero automated violations
+- All interactive elements are operable via keyboard with visible focus indicators
+- All non-text content has appropriate text alternatives
+- Colour contrast meets WCAG AA minimums: 4.5:1 for normal text, 3:1 for large text and UI components
