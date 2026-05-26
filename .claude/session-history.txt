@@ -1,0 +1,2 @@
+2026-05-21 10:50:00 | 8735203f-79e6-4885-8926-5e1c20b2dd01 | /home/dprice/Projects/C1Pay | /home/dprice/.claude/projects/-home-dprice-Projects-C1Pay/8735203f-79e6-4885-8926-5e1c20b2dd01.jsonl
+2026-05-21 10:52:54 | 8735203f-79e6-4885-8926-5e1c20b2dd01 | /home/dprice/Projects/C1Pay | /home/dprice/.claude/projects/-home-dprice-Projects-C1Pay/8735203f-79e6-4885-8926-5e1c20b2dd01.jsonl
