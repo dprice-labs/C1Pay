@@ -1,5 +1,5 @@
 ---
-stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics']
+stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-epic-1', 'step-03-epic-2']
 inputDocuments:
   - '_bmad-output/planning-artifacts/prd.md'
   - '_bmad-output/planning-artifacts/architecture.md'
@@ -200,3 +200,208 @@ The application meets WCAG AA at all viewport sizes and is fully keyboard operab
 ### Epic 7 (Phase 2): Learning Layer
 Every architectural decision and practice demonstrated in the codebase is documented with decision records and concept docs — the codebase becomes a complete self-teaching artifact.
 **FRs covered:** FR41, FR42, FR43, FR44
+
+---
+
+## Epic 1: Foundation & Authentication
+
+**Goal:** Users can register, log in, and log out securely. All routes are protected. The test pyramid infrastructure is in place and proven.
+
+**FRs covered:** FR1, FR2, FR3, FR4, FR5, FR6, FR40
+**NFRs relevant:** NFR4, NFR5, NFR6, NFR7, NFR9
+
+---
+
+### Story 1.1: Project Scaffold & Infrastructure
+
+As a developer,
+I want a configured Next.js project with test pyramid infrastructure,
+So that I can begin implementing features with the correct tooling and test structure from the first commit.
+
+**Acceptance Criteria:**
+
+**Given** the repo is cloned, **When** `npm run dev` is executed, **Then** the default Next.js app runs on localhost:3000 without errors
+
+**Given** the project is initialized, **When** `src/lib/logger.ts` is imported, **Then** it provides `logger.info()`, `logger.error()`, and `logger.warn()` methods that prefix output with `[LEVEL] [context] message`
+
+**Given** the project is initialized, **When** `src/lib/errors.ts` is inspected, **Then** it exports an `AppError` class with `message`, `code`, and `status` properties and an `errorResponse(message, code, status)` helper
+
+**Given** the test pyramid is configured, **When** `npm run test:unit` is run, **Then** Vitest runs only tests in `tests/unit/` with no DB or network access
+
+**Given** the test pyramid is configured, **When** `npm run test:integration` is run, **Then** Vitest runs tests in `tests/integration/` using a real test database
+
+**Given** the test pyramid is configured, **When** `npm run test:e2e` is run, **Then** Playwright runs tests in `tests/e2e/`
+
+**Given** the project is initialized, **When** `.env.example` is inspected, **Then** it documents `DATABASE_URL` and `JWT_SECRET` with placeholder values and inline comments describing each variable
+
+**Given** any server-side module is written, **Then** it imports from `logger.ts` — no raw `console.log` in server code
+
+---
+
+### Story 1.2: Database Foundation
+
+As a developer,
+I want a configured Drizzle ORM client with the users schema and migration workflow,
+So that the database layer is ready for user data to be persisted in the next story.
+
+**Acceptance Criteria:**
+
+**Given** `src/db/index.ts` exists, **When** imported, **Then** it exports a singleton Drizzle client connected to `DATABASE_URL` — no other module instantiates a second client
+
+**Given** `src/db/schema/users.ts` exists, **Then** it defines a `users` table with: `id` (serial PK), `username` (text, unique, not null), `password_hash` (text, not null), `balance_cents` (integer, not null, default 0), `created_at` (timestamp with timezone, default now())
+
+**Given** `drizzle.config.ts` exists, **When** `drizzle-kit generate` is run, **Then** it produces a versioned SQL migration file in `src/db/migrations/`
+
+**Given** a migration file exists, **When** `drizzle-kit migrate` is run, **Then** the `users` table is created in the PostgreSQL database
+
+**Given** the migration is applied, **When** a duplicate username is inserted, **Then** the database enforces the unique constraint and rejects the insert
+
+---
+
+### Story 1.3: User Registration
+
+As a new user,
+I want to register an account with a unique username and password,
+So that I can access the application with a starting balance.
+
+**Acceptance Criteria:**
+
+**Given** the `/register` page, **When** a user submits a valid username, password, and matching confirm password, **Then** `POST /api/auth/register` is called and on success the user is redirected to `/login`
+
+**Given** the `/register` page, **When** the password and confirm password fields do not match, **Then** a client-side validation error is shown before submission and the form is not submitted
+
+**Given** `POST /api/auth/register` receives a valid username and password, **When** executed, **Then** `createUser()` in `src/lib/users.ts` creates the user in the database with `balance_cents` of `100000` ($1,000.00)
+
+**Given** a registration request, **When** `createUser()` runs, **Then** the password is hashed with bcryptjs at work factor 12 — plaintext password is never stored or logged
+
+**Given** a registration request with a username that already exists, **When** executed, **Then** it returns `409 { "error": "Username already taken", "code": "USERNAME_TAKEN" }`
+
+**Given** a registration request with missing or empty username or password, **When** Zod validation runs, **Then** it returns `400 { "error": "Validation failed", "code": "VALIDATION_ERROR" }`
+
+**Given** a unit test for `createUser()`, **When** run, **Then** it verifies correct bcrypt hashing without a real database
+
+**Given** an integration test for registration, **When** run, **Then** it verifies a user is created in the real database with a hashed password and `balance_cents = 100000`
+
+_Note: confirm password is UI-only — `POST /api/auth/register` receives a single `password` field; the match check is client-side only._
+
+---
+
+### Story 1.4: User Login & Session
+
+As a registered user,
+I want to log in with my username and password,
+So that I receive a session cookie granting access to protected routes.
+
+**Acceptance Criteria:**
+
+**Given** the `/login` page, **When** valid credentials are submitted, **Then** `POST /api/auth/login` is called and on success the user is redirected to `/` (home)
+
+**Given** `POST /api/auth/login` receives valid credentials, **When** executed, **Then** it returns a `Set-Cookie` header setting an `HttpOnly`, `SameSite=Strict`, `Path=/` cookie containing a signed JWT
+
+**Given** the JWT is issued, **Then** its payload contains only `userId`, it is signed with `JWT_SECRET` via `jose`, and carries a 1-day expiry
+
+**Given** invalid credentials are submitted, **When** executed, **Then** it returns `401 { "error": "Invalid username or password", "code": "INVALID_CREDENTIALS" }` — same response for wrong password and unknown username (no username enumeration)
+
+**Given** a unit test for `src/lib/auth.ts`, **When** run, **Then** `signJwt()` produces a token with correct claims and `verifyJwt()` rejects expired or tampered tokens
+
+**Given** an integration test for login, **When** run, **Then** it verifies credentials are validated against a real database user and a cookie is set on success
+
+---
+
+### Story 1.5: Route Protection & Logout
+
+As the system,
+I want all protected routes to enforce JWT authentication,
+So that unauthenticated users are redirected to login and authenticated users can end their session cleanly.
+
+**Acceptance Criteria:**
+
+**Given** `middleware.ts` is configured, **When** an unauthenticated request hits any `/(protected)` route, **Then** the user is redirected to `/login`
+
+**Given** `middleware.ts` is configured, **When** a request carries a valid JWT cookie, **Then** it passes through to the protected route without redirect
+
+**Given** `middleware.ts` is configured, **When** a request carries an expired JWT cookie, **Then** the user is redirected to `/login`
+
+**Given** a logout button in the protected layout, **When** clicked, **Then** `POST /api/auth/logout` is called, the JWT cookie is cleared (expired via `Set-Cookie`), and the user is redirected to `/login`
+
+**Given** an unauthenticated request to any `/api/` route other than `/api/auth/*`, **Then** it returns `401 { "error": "Unauthorized", "code": "UNAUTHORIZED" }`
+
+**Given** an e2e test for the full auth flow, **When** run, **Then** it covers: register → login → access protected page → logout → redirect to `/login` → protected page no longer accessible
+
+---
+
+## Epic 2: Home Screen & Real-Time Foundation
+
+**Goal:** After login, users see their current balance and pending request count. The SSE connection is live and the client state architecture is fully in place.
+
+**FRs covered:** FR7, FR25, FR29
+**NFRs relevant:** NFR1, NFR2
+**UX-DRs relevant:** UX-DR1, UX-DR6, UX-DR11
+
+---
+
+### Story 2.1: Protected Layout & Zustand Foundation
+
+As a developer,
+I want Zustand stores initialized with server-fetched data and a client wrapper that mounts the SSE hook,
+So that all protected pages share a single source of truth for balance, pending request count, and auth state.
+
+**Acceptance Criteria:**
+
+**Given** `src/store/auth.ts` exists, **When** imported, **Then** it exports `useAuthStore` with `{ user, setUser, clearUser }` state and actions
+
+**Given** `src/store/balance.ts` exists, **When** imported, **Then** it exports `useBalanceStore` with `{ balanceCents, setBalance }` state and actions
+
+**Given** `src/store/requests.ts` exists, **When** imported, **Then** it exports `useRequestStore` with `{ pendingCount, setPendingCount }` state and actions
+
+**Given** `/(protected)/layout.tsx` is a Server Component, **When** rendered for an authenticated user, **Then** it calls `getAuthUser()` to extract the userId from the JWT cookie, fetches the user's `balance_cents` and pending request count directly from the database, and passes them as props to `Providers.tsx`
+
+**Given** `Providers.tsx` is a `'use client'` component, **When** mounted, **Then** it seeds `useBalanceStore` with `initialBalance` and `useRequestStore` with `initialPendingCount` received from the layout
+
+**Given** a unit test for each Zustand store, **When** run, **Then** it verifies each store's actions update state correctly without any database or network dependencies
+
+---
+
+### Story 2.2: Home Screen UI
+
+As an authenticated user,
+I want to see my current balance and quick-access actions on the home screen,
+So that I can orient myself immediately after login and act without navigating away.
+
+**Acceptance Criteria:**
+
+**Given** the home page `/`, **When** rendered, **Then** it displays the authenticated user's current balance as the hero element — prominently positioned and clearly labelled — reading from `useBalanceStore`
+
+**Given** `src/components/ui/AmountDisplay.tsx` exists, **When** passed an integer cents value, **Then** it renders the formatted currency string (e.g., `100000` → `$1,000.00`); this component is used consistently wherever a monetary amount is displayed
+
+**Given** the home page, **When** rendered, **Then** it displays a "Send" button and a "Request" button as large, immediately accessible primary CTAs
+
+**Given** the home page, **When** rendered, **Then** it displays an inbox badge showing the pending incoming request count from `useRequestStore`; the badge is not shown when the count is zero
+
+**Given** a unit test for `AmountDisplay`, **When** run, **Then** it verifies correct cent-to-currency formatting for representative values including zero, round dollars, and dollars with cents
+
+---
+
+### Story 2.3: SSE Connection & Real-Time Updates
+
+As an authenticated user,
+I want my balance and inbox badge to update in real time without any page action,
+So that changes initiated by other users are immediately visible to me.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/sse-emitter.ts` exists, **When** imported, **Then** it exports `emit(userId, event)`, `register(userId, writer)`, and `deregister(userId)` functions backed by a `Map<number, WritableStreamDefaultWriter>`
+
+**Given** `GET /api/sse`, **When** called by an authenticated user, **Then** it registers a `WritableStreamDefaultWriter` in the emitter map and holds the connection open with a `text/event-stream` response
+
+**Given** `GET /api/sse`, **When** the client disconnects, **Then** the writer is deregistered from the emitter map
+
+**Given** `src/hooks/use-sse.ts` is mounted inside `Providers.tsx`, **When** a `BALANCE_UPDATED` event arrives, **Then** it calls `useBalanceStore.setBalance()` with the new `balance` value
+
+**Given** `useSSE` receives a `REQUEST_RECEIVED` or `REQUEST_RESOLVED` event, **When** dispatched, **Then** it calls `useRequestStore.setPendingCount()` with the updated count
+
+**Given** the SSE connection drops due to network interruption, **When** connectivity is restored, **Then** the browser's `EventSource` reconnects automatically without user action (FR29)
+
+**Given** an e2e test for the SSE infrastructure, **When** run, **Then** it verifies the connection opens on page load, and reconnects after being dropped
+
+_Note: `emit()` is not called by any money-movement handler until Epic 3. This story proves the infrastructure is correctly wired — live balance and badge updates are the payoff in Epics 3 and 4._
