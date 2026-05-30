@@ -1,5 +1,5 @@
 ---
-stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-epic-1', 'step-03-epic-2']
+stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-epic-1', 'step-03-epic-2', 'step-03-epic-3', 'step-03-epic-4', 'step-03-epic-5', 'step-03-epic-6', 'step-03-epic-7']
 inputDocuments:
   - '_bmad-output/planning-artifacts/prd.md'
   - '_bmad-output/planning-artifacts/architecture.md'
@@ -405,3 +405,460 @@ So that changes initiated by other users are immediately visible to me.
 **Given** an e2e test for the SSE infrastructure, **When** run, **Then** it verifies the connection opens on page load, and reconnects after being dropped
 
 _Note: `emit()` is not called by any money-movement handler until Epic 3. This story proves the infrastructure is correctly wired — live balance and badge updates are the payoff in Epics 3 and 4._
+
+---
+
+## Epic 3: Send Money & Transaction History
+
+**Goal:** Users can find other users, send money, and view their full transaction history. The recipient's balance updates in real time — the SSE infrastructure from Epic 2 comes alive.
+
+**FRs covered:** FR8, FR9, FR10, FR11, FR12, FR13, FR14, FR23, FR24, FR26
+**NFRs relevant:** NFR1, NFR3, NFR9
+**UX-DRs relevant:** UX-DR2, UX-DR4, UX-DR5, UX-DR6, UX-DR9, UX-DR10
+
+---
+
+### Story 3.1: Transactions Schema & Atomic Send Service
+
+As a developer,
+I want a transactions table and an atomic `sendMoney` service with balance-gate validation,
+So that money can move between users with guaranteed integrity before any UI is built on top.
+
+**Acceptance Criteria:**
+
+**Given** `src/db/schema/transactions.ts` exists, **Then** it defines a `transactions` table with: `id` (serial PK), `sender_id` (integer FK → `users.id`, not null), `recipient_id` (integer FK → `users.id`, not null), `amount_cents` (integer, not null), `note` (text, nullable), `created_at` (timestamp with timezone, default now()); plus indexes `idx_transactions_sender_id` and `idx_transactions_recipient_id`
+
+**Given** the schema is added, **When** `drizzle-kit generate` then `drizzle-kit migrate` is run, **Then** a versioned migration file is produced and the `transactions` table is created in PostgreSQL
+
+**Given** `src/lib/transactions.ts` exists, **Then** it exports `async function sendMoney(senderId: number, recipientId: number, amountCents: number, note?: string): Promise<Transaction>`
+
+**Given** `sendMoney` runs with valid inputs, **When** executed, **Then** it opens a single Drizzle transaction that locks both the sender and recipient rows with `SELECT ... FOR UPDATE` (raw SQL), debits the sender's `balance_cents`, credits the recipient's `balance_cents`, and inserts one `transactions` row — all committed atomically (FR9, FR13)
+
+**Given** a completed send, **Then** funds transfer immediately with no pending state and the single transaction row records the transfer for both parties — `sender_id`/`recipient_id` encode direction; per-viewer sent/received is derived at read time, not duplicated (FR12, FR14, NFR9)
+
+**Given** `sendMoney` where `amountCents` exceeds the sender's available balance, **When** executed, **Then** it throws an `AppError` with code `INSUFFICIENT_BALANCE` and no balance change or transaction row is persisted (FR8)
+
+**Given** `sendMoney` where `amountCents <= 0`, **Then** it throws an `AppError` with code `INVALID_AMOUNT`
+
+**Given** `sendMoney` where `senderId === recipientId`, **Then** it throws an `AppError` with code `SELF_TRANSFER`
+
+**Given** a unit test for `sendMoney` validation, **When** run, **Then** it verifies `INSUFFICIENT_BALANCE`, `INVALID_AMOUNT`, and `SELF_TRANSFER` are thrown without a real database
+
+**Given** an integration test for concurrent sends, **When** two sends from the same sender execute against a real database, **Then** row-level locking serialises them and the sender's balance never goes negative (FR9)
+
+_Note: `sendMoney` does NOT emit any SSE event in this story — the `emit()` wiring is Story 3.3._
+
+---
+
+### Story 3.2: Send Money Flow (Search, Amount, Confirm)
+
+As an authenticated user,
+I want a guided flow where I find a recipient, enter an amount and optional note, and confirm,
+So that I can transfer money with clear intent and no dead ends.
+
+**Acceptance Criteria:**
+
+**Given** `GET /api/users/search?q={term}`, **When** called by an authenticated user, **Then** it returns matching users by username — excluding the requester — as `[{ id, username }]`, never exposing `password_hash` or `balance_cents` (FR10)
+
+**Given** the search query is empty or below the minimum length, **Then** it returns an empty array without a full-table scan, and the query uses `idx_users_username` (NFR3)
+
+**Given** the `/send` page, **When** rendered, **Then** it presents a 3-step funnel — (1) recipient selection via `UserSearchInput`, (2) amount + optional note, (3) confirmation summary — with the current step always clear and backward navigation available; no dead ends (UX-DR2)
+
+**Given** step 1, **When** the user types in `UserSearchInput`, **Then** matching usernames appear and selecting one advances to step 2
+
+**Given** step 2, **When** the user enters an amount, **Then** it is captured as integer cents, the optional note is captured, and the confirmation step renders the amount via `AmountDisplay` as formatted currency (UX-DR10)
+
+**Given** step 3, **When** the user confirms, **Then** `POST /api/transactions` is called with `{ recipientId, amountCents, note? }` validated by `sendMoneySchema` (Zod), and on `201` the user is returned to home (FR11, FR12)
+
+**Given** `POST /api/transactions` returns `409 { "code": "INSUFFICIENT_BALANCE" }`, **Then** the UI states the shortfall explicitly (e.g., "Insufficient balance — you have $X.XX, this transfer is for $Y.YY") — never a generic message or bare disabled state (UX-DR9)
+
+**Given** invalid input, **When** `sendMoneySchema` validation fails, **Then** the API returns `400 { "code": "VALIDATION_ERROR" }` and the error is surfaced inline on the relevant field
+
+**Given** an e2e test for the send flow, **When** run, **Then** it covers searching for and selecting a recipient, entering an amount, confirming, and the successful transfer reflected in the sender's balance
+
+---
+
+### Story 3.3: Real-Time Recipient Balance Update
+
+As a user receiving money,
+I want my balance to update on screen the instant another user sends me funds,
+So that the transfer is immediately visible without any action on my part.
+
+**Acceptance Criteria:**
+
+**Given** `sendMoney` commits successfully, **When** the transaction is recorded, **Then** it emits a `BALANCE_UPDATED` SSE event to the recipient's `userId` via `sse-emitter` carrying the recipient's new `balanceCents` as integer cents (FR26)
+
+**Given** the emit, **Then** it occurs only after the DB transaction commits — a rolled-back or failed transfer emits nothing
+
+**Given** the recipient has an open SSE connection (Epic 2 `useSSE`), **When** the `BALANCE_UPDATED` event arrives, **Then** `useBalanceStore.setBalance()` updates and the rendered balance changes within 1 second under local conditions (NFR1)
+
+**Given** the balance value changes on screen, **Then** the change is visually animated (a brief highlight or count-up) drawing the eye to the number as it updates (UX-DR6)
+
+**Given** the sender's own session, **When** the send action returns successfully, **Then** the sender's balance reflects the debit so both screens are consistent
+
+**Given** a two-client e2e test, **When** user A sends money to user B with both sessions open, **Then** user B's balance updates live without a reload, and user A's balance reflects the debit
+
+---
+
+### Story 3.4: Transaction History
+
+As an authenticated user,
+I want a chronological list of all my transactions with full detail,
+So that I can review every transfer I have sent or received.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/transactions.ts`, **Then** it exports `getTransactionHistory(userId: number): Promise<Transaction[]>` returning all transactions where the user is sender or recipient, ordered by `created_at` descending
+
+**Given** `getTransactionHistory`, **When** executed, **Then** counterparty usernames are resolved via a join in a single query — no N+1 pattern (NFR3)
+
+**Given** `GET /api/transactions`, **When** called by an authenticated user, **Then** it returns that user's transaction history (FR23)
+
+**Given** the `/history` page (Server Component), **When** rendered, **Then** it lists transactions newest-first, each rendered by `TransactionRow`
+
+**Given** a `TransactionRow`, **Then** it displays the counterparty username, a direction indicator (sent vs received relative to the viewer), the amount via `AmountDisplay`, the type, the optional note (when present), and the timestamp — in a scannable, dense layout (FR24, UX-DR4)
+
+**Given** the viewer is the sender of a transaction, **Then** the row shows a "sent" direction; **Given** the viewer is the recipient, **Then** it shows "received" — derived from `sender_id`/`recipient_id` versus the viewer
+
+**Given** the UI labels, **Then** entities are named exactly as the data model — "transaction", "balance" — with no euphemistic or abstracted naming (UX-DR5)
+
+**Given** the user has no transactions, **Then** the history shows an explicit empty state
+
+**Given** an integration test for `getTransactionHistory`, **When** run, **Then** it verifies a user sees both sent and received transactions in descending chronological order with correct counterparty resolution
+
+---
+
+## Epic 4: Request Flow & State Machine
+
+**Goal:** Users can request money, manage their inbox (pay/decline), cancel their own outgoing requests, and see all state transitions clearly. Inbox and balance update in real time.
+
+**FRs covered:** FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR27, FR28
+**NFRs relevant:** NFR1, NFR3, NFR9
+**UX-DRs relevant:** UX-DR3, UX-DR7, UX-DR9, UX-DR11, UX-DR12
+
+---
+
+### Story 4.1: Requests Schema & Create Request
+
+As an authenticated user,
+I want to request money from another registered user,
+So that a pending request appears in their inbox for them to act on.
+
+**Acceptance Criteria:**
+
+**Given** `src/db/schema/requests.ts` exists, **Then** it defines a PostgreSQL enum `request_status` with values `PENDING`, `PAID`, `DECLINED`, `CANCELLED`, and a `payment_requests` table with: `id` (serial PK), `requester_id` (integer FK → `users.id`, not null), `recipient_id` (integer FK → `users.id`, not null), `amount_cents` (integer, not null), `note` (text, nullable), `status` (`request_status`, not null, default `PENDING`), `created_at` (timestamp with timezone, default now()), `resolved_at` (timestamp with timezone, nullable)
+
+**Given** the schema is added, **When** `drizzle-kit generate` then `drizzle-kit migrate` is run, **Then** a versioned migration file is produced and the enum + `payment_requests` table are created in PostgreSQL
+
+**Given** `src/lib/requests.ts` exists, **Then** it exports `async function createRequest(requesterId: number, recipientId: number, amountCents: number, note?: string): Promise<PaymentRequest>`
+
+**Given** `createRequest` runs with valid inputs, **When** executed, **Then** it inserts one `payment_requests` row with `status = PENDING` and `resolved_at = null` (FR15, FR16)
+
+**Given** `createRequest` where `amountCents <= 0`, **Then** it throws an `AppError` with code `INVALID_AMOUNT`
+
+**Given** `createRequest` where `requesterId === recipientId`, **Then** it throws an `AppError` with code `SELF_REQUEST`
+
+**Given** the `/request` page, **When** rendered, **Then** it presents a flow to select a recipient via `UserSearchInput`, enter an amount and optional note in `CreateRequestForm`, and submit — calling `POST /api/requests` with `{ recipientId, amountCents, note? }` validated by `createRequestSchema` (Zod)
+
+**Given** `POST /api/requests` succeeds, **When** the request is created, **Then** it returns `201` and the user is returned to home; validation failure returns `400 { "code": "VALIDATION_ERROR" }`
+
+**Given** a unit test for `createRequest` validation, **When** run, **Then** it verifies `INVALID_AMOUNT` and `SELF_REQUEST` are thrown without a real database
+
+**Given** an integration test for `createRequest`, **When** run, **Then** it verifies a `payment_requests` row is persisted with `status = PENDING` against the real database
+
+_Note: `createRequest` does NOT emit any SSE event in this story — the `emit()` wiring is Story 4.5._
+
+---
+
+### Story 4.2: Inbox & Pending Request Display
+
+As an authenticated user,
+I want to see the payment requests addressed to me with their current state,
+So that I understand what is pending and can decide how to act on each.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/requests.ts`, **Then** it exports `getInboxRequests(userId: number): Promise<PaymentRequest[]>` returning the user's incoming requests with `status = PENDING`, requester usernames resolved via a join in a single query (no N+1, NFR3)
+
+**Given** `GET /api/requests`, **When** called by an authenticated user, **Then** it returns that user's pending incoming requests (FR16)
+
+**Given** the `/requests` inbox page, **When** rendered, **Then** it lists each pending incoming request via `RequestCard`, showing the requester username, amount via `AmountDisplay`, optional note, and timestamp
+
+**Given** a `RequestCard`, **Then** the request state is rendered with an explicit labelled status badge — a text label (`PENDING`, `PAID`, `DECLINED`, `CANCELLED`) plus a subtle colour — never colour alone (UX-DR3)
+
+**Given** a `RequestCard`, **Then** the 4-state lifecycle is surfaced as a compact event log / state indicator showing the transition history (`PENDING → PAID|DECLINED|CANCELLED`) as a teaching artifact (UX-DR12)
+
+**Given** the inbox has no pending requests, **Then** the page shows an explicit empty state
+
+**Given** an integration test for `getInboxRequests`, **When** run, **Then** it verifies only `PENDING` incoming requests for the user are returned, with correct requester resolution
+
+---
+
+### Story 4.3: Pay & Decline a Request
+
+As a recipient of a payment request,
+I want to pay or decline a pending request,
+So that I can resolve it — transferring funds on pay, or dismissing it on decline.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/requests.ts`, **Then** it exports `payRequest(requestId, userId)` and `declineRequest(requestId, userId)`
+
+**Given** `payRequest` runs for a `PENDING` request where the caller is the recipient, **When** executed, **Then** it opens a single Drizzle transaction that locks both parties' rows with `SELECT ... FOR UPDATE`, debits the payer, credits the requester, inserts a `transactions` row, and sets the request `status = PAID` with `resolved_at = now()` — all committed atomically (FR17, FR21, NFR9 reuses the transfer path)
+
+**Given** `payRequest` where the payer's balance is insufficient, **When** executed, **Then** it throws an `AppError` with code `INSUFFICIENT_BALANCE` and nothing is persisted (FR22)
+
+**Given** the Pay action in the UI, **When** the payer's balance is insufficient, **Then** the reason is stated explicitly (e.g., "Insufficient balance — you have $X.XX, this request is for $Y.YY") — never just a greyed-out disabled state (UX-DR7, UX-DR9)
+
+**Given** `declineRequest` runs for a `PENDING` request where the caller is the recipient, **When** executed, **Then** it sets `status = DECLINED` with `resolved_at = now()` and no funds move (FR18)
+
+**Given** `PATCH /api/requests/[id]` with an action of pay or decline, **When** called by the recipient, **Then** it invokes the matching service and returns the updated request; the action surfaces on `RequestCard`
+
+**Given** any resolve action on a request that is not `PENDING`, **When** executed, **Then** it returns `409 { "code": "REQUEST_ALREADY_RESOLVED" }`
+
+**Given** a `PATCH` where the caller is not the request's recipient, **Then** it returns `403 { "code": "FORBIDDEN" }`
+
+**Given** a request is resolved (paid or declined), **Then** it is removed from the recipient's active (pending) inbox (FR20) and the outcome is recorded in both parties' transaction history where funds moved (FR21)
+
+**Given** a unit test for the resolve guards, **When** run, **Then** it verifies a non-`PENDING` request rejects pay/decline and a non-recipient caller is forbidden, without a real database
+
+**Given** an integration test for `payRequest`, **When** run, **Then** it verifies the atomic debit/credit, the `PAID` transition, and the insufficient-balance guard against the real database
+
+---
+
+### Story 4.4: Cancel an Outgoing Request
+
+As a user who sent a payment request,
+I want to cancel my own pending request,
+So that I can withdraw it before the recipient acts on it.
+
+**Acceptance Criteria:**
+
+**Given** `src/lib/requests.ts`, **Then** it exports `getOutgoingRequests(userId: number): Promise<PaymentRequest[]>` returning the user's `PENDING` requests they created, and `cancelRequest(requestId, userId)`
+
+**Given** the `/requests` view, **When** rendered, **Then** it surfaces the user's outgoing pending requests (as a distinct section or tab from the incoming inbox), each showing recipient, amount, note, timestamp, and a labelled status badge (UX-DR3)
+
+**Given** `cancelRequest` runs for a `PENDING` request where the caller is the requester, **When** executed, **Then** it sets `status = CANCELLED` with `resolved_at = now()` and no funds move (FR19)
+
+**Given** `PATCH /api/requests/[id]` with a cancel action, **When** called by the requester, **Then** it invokes `cancelRequest` and the request is removed from active lists (FR20); the outcome is recorded in both parties' history view (FR21)
+
+**Given** a cancel on a request that is not `PENDING`, **When** executed, **Then** it returns `409 { "code": "REQUEST_ALREADY_RESOLVED" }`
+
+**Given** a cancel where the caller is not the request's requester, **Then** it returns `403 { "code": "FORBIDDEN" }`
+
+**Given** an integration test for `cancelRequest`, **When** run, **Then** it verifies the `CANCELLED` transition, the requester-only guard, and that an already-resolved request cannot be cancelled
+
+---
+
+### Story 4.5: Real-Time Inbox & Resolution Updates
+
+As a user involved in a request,
+I want my inbox and balance to update in real time as requests are created and resolved,
+So that I see incoming requests and the outcomes of my own requests without refreshing.
+
+**Acceptance Criteria:**
+
+**Given** `createRequest` commits successfully, **When** the request is persisted, **Then** it emits a `REQUEST_RECEIVED` SSE event to the recipient's `userId` carrying `{ requestId, fromUsername, amountCents, note? }` (FR27)
+
+**Given** the recipient has an open SSE connection (Epic 2 `useSSE`), **When** `REQUEST_RECEIVED` arrives, **Then** `useRequestStore.setPendingCount()` increments and the inbox badge updates within 1 second — the change is visually noticeable, not subtle (UX-DR11, NFR1)
+
+**Given** a request is resolved via `payRequest`, `declineRequest`, or `cancelRequest`, **When** committed, **Then** it emits a `REQUEST_RESOLVED` event carrying `{ requestId, status }` to the other party — to the requester on pay/decline, and to the recipient on cancel (FR28)
+
+**Given** the requester has an open SSE connection, **When** their request is paid, **Then** they receive both a `REQUEST_RESOLVED` event (inbox/list updates) and a `BALANCE_UPDATED` event (funds received) so inbox and balance both update live (FR28)
+
+**Given** every emit, **Then** it occurs only after the DB transaction commits — a rolled-back or failed operation emits nothing
+
+**Given** a two-client e2e test (`realtime.spec.ts`), **When** user A requests money from user B and user B pays, with both sessions open, **Then** user B's inbox shows the request live on receipt, and on payment user A's balance updates and the request leaves the pending list — all without a reload
+
+---
+
+## Epic 5: Batch Administration
+
+**Goal:** A facilitator can create and reset test accounts via a single CLI command. Training session prep takes under two minutes with no UI required.
+
+**FRs covered:** FR33, FR34, FR35, FR36
+**NFRs relevant:** NFR9
+**Architecture:** `scripts/seed.ts` — CLI-only, no admin UI; calls `src/lib/` service functions directly (plain async functions, no HTTP types).
+
+---
+
+### Story 5.1: Batch Create Test Accounts
+
+As a session facilitator,
+I want to create a batch of test accounts with a single command,
+So that I can prepare a training session in under two minutes without any UI.
+
+**Acceptance Criteria:**
+
+**Given** `scripts/seed.ts` exists, **When** invoked with a create command (e.g., `npm run seed -- create`), **Then** it creates a configured number of test user accounts in a single run (FR33)
+
+**Given** the create command, **When** it creates accounts, **Then** every account is assigned the same specified starting balance (the configured `balance_cents` value applied uniformly to all accounts) (FR34)
+
+**Given** the create command, **Then** each account is created through the existing `createUser()` service in `src/lib/users.ts` — no user-creation or password-hashing logic is duplicated in the script (NFR9), so passwords are bcrypt-hashed at work factor 12 exactly as in registration
+
+**Given** the create command is run a second time with the same configuration, **When** executed, **Then** it is idempotent — it does not create duplicate accounts or corrupt existing data (e.g., it skips accounts whose usernames already exist) and the final state matches a single run (FR36)
+
+**Given** the create command, **When** it completes, **Then** it logs a clear summary (accounts created vs. skipped, starting balance applied) via `src/lib/logger.ts`
+
+**Given** an integration test for the create command, **When** run twice against a real test database, **Then** it verifies the expected accounts exist with the correct starting balance and that the second run produces no duplicates
+
+---
+
+### Story 5.2: Reset Test Accounts
+
+As a session facilitator,
+I want to reset all test accounts to their starting state with a single command,
+So that I can re-run a training session from a clean slate.
+
+**Acceptance Criteria:**
+
+**Given** `scripts/seed.ts`, **When** invoked with a reset command (e.g., `npm run seed -- reset`), **Then** it clears all `transactions` and `payment_requests` rows for the test accounts and restores each account's `balance_cents` to the configured starting balance (FR35)
+
+**Given** the reset command, **When** executed, **Then** the clearing and balance restoration run within a transaction so the reset is all-or-nothing — no account is left partially reset
+
+**Given** the reset command is run multiple times in succession, **When** executed, **Then** it is idempotent — each run leaves the accounts in the identical starting state regardless of prior history (FR36)
+
+**Given** the reset command, **When** it completes, **Then** it logs a clear summary (accounts reset, history rows cleared) via `src/lib/logger.ts`
+
+**Given** an integration test for the reset command, **When** run after seeding accounts and creating transactions and requests, **Then** it verifies all history is cleared, balances are restored to the starting value, and a second reset produces the identical state
+
+---
+
+## Epic 6: Accessibility & Responsive Design
+
+**Goal:** The application meets WCAG AA at all viewport sizes and is fully keyboard operable — surfaced as an explicit, demonstrated teaching artifact throughout the codebase.
+
+**FRs covered:** FR30, FR31, FR32
+**NFRs relevant:** NFR13, NFR14, NFR15, NFR16
+**UX-DRs relevant:** UX-DR8
+
+---
+
+### Story 6.1: Semantic Structure, ARIA & Contrast Baseline
+
+As a user relying on assistive technology,
+I want the application built on semantic HTML with correct ARIA and accessible colour,
+So that the structure and meaning of every screen are conveyed regardless of how I perceive it.
+
+**Acceptance Criteria:**
+
+**Given** any page, **When** rendered, **Then** it uses semantic HTML landmarks (`header`, `nav`, `main`, appropriate headings in order) rather than generic `div`/`span` for structural elements (FR31)
+
+**Given** interactive and dynamic elements (forms, buttons, the inbox badge, status badges, live balance), **Then** they carry appropriate ARIA roles and labels — including an `aria-live` region for the SSE-driven balance and inbox updates so changes are announced (FR31)
+
+**Given** any non-text content (icons, direction indicators, status colour), **Then** it has an appropriate text alternative; meaning is never conveyed by colour alone (NFR15)
+
+**Given** the colour palette, **When** any text or UI component is rendered, **Then** contrast meets WCAG AA minimums — 4.5:1 for normal text, 3:1 for large text and UI components (NFR16)
+
+**Given** a reusable visible-focus indicator style, **Then** it is defined once and applied consistently to all focusable elements (no `outline: none` without a replacement)
+
+**Given** the request status badges from Epic 4, **Then** they convey state with a text label plus colour — confirming the "never colour alone" rule holds across the request state machine (UX-DR3 cross-check)
+
+---
+
+### Story 6.2: Keyboard-First Navigation Across Core Flows
+
+As a keyboard-only user,
+I want to complete every core flow without a mouse,
+So that the application is fully operable by keyboard as a first-class, demonstrated practice.
+
+**Acceptance Criteria:**
+
+**Given** each core flow — register, log in, send, request, pay, decline, cancel, log out — **When** operated using only the keyboard, **Then** it can be completed end to end with no mouse interaction (FR32)
+
+**Given** any interactive element, **Then** it is reachable via the keyboard and shows a visible focus indicator when focused (NFR14, UX-DR8)
+
+**Given** the tab order on every page, **Then** it follows a logical, predictable sequence matching the visual reading order (UX-DR8)
+
+**Given** the 3-step send funnel and the request flows, **When** navigated by keyboard, **Then** focus is managed sensibly across steps (focus moves to the new step's first control; no focus traps)
+
+**Given** mod/dialog or confirmation surfaces (if present), **Then** focus is contained while open and returned to the triggering element on close
+
+**Given** an e2e test driving each core flow by keyboard only, **When** run, **Then** it verifies each flow completes without pointer events
+
+---
+
+### Story 6.3: Responsive Layout (Mobile / Tablet / Desktop)
+
+As a user on any device,
+I want the application to adapt to my screen size,
+So that I can use every feature without loss of functionality.
+
+**Acceptance Criteria:**
+
+**Given** the application, **When** viewed at mobile, tablet, and desktop viewport widths, **Then** every screen is usable and no functionality is lost or inaccessible at any size (FR30)
+
+**Given** layout adaptation, **Then** it is expressed through Tailwind breakpoint utilities (no fixed pixel widths that overflow small viewports)
+
+**Given** the home screen, send/request flows, inbox, and history at a mobile width, **Then** content reflows without horizontal scrolling and interactive targets remain comfortably tappable
+
+**Given** an e2e test run at representative mobile, tablet, and desktop widths, **When** executed, **Then** it verifies the core flows are operable at each width
+
+---
+
+### Story 6.4: Automated WCAG AA Audit Gate
+
+As a developer maintaining the codebase,
+I want automated accessibility checks on every page,
+So that WCAG AA compliance is continuously verified and regressions are caught.
+
+**Acceptance Criteria:**
+
+**Given** the Playwright e2e suite, **Then** axe-core is integrated and run against every page/route of the application
+
+**Given** the axe-core audit, **When** run on any page, **Then** it reports zero automated WCAG 2.1 AA violations (NFR13, FR31)
+
+**Given** the accessibility audit, **Then** it executes as part of the e2e quality gate so a new violation fails the test run
+
+**Given** an audit failure, **When** reported, **Then** the output identifies the offending rule, element, and page so the issue is actionable
+
+---
+
+## Epic 7 (Phase 2): Learning Layer
+
+**Goal:** Every architectural decision and practice demonstrated in the codebase is documented with decision records and concept docs — the codebase becomes a complete self-teaching artifact.
+
+**FRs covered:** FR41, FR42, FR43, FR44 (all Phase 2)
+**Knowledge location:** `docs/`
+
+---
+
+### Story 7.1: Architectural Decision Records
+
+As a reader studying the codebase,
+I want a decision record for each major architectural choice,
+So that I understand not just what was built but why — including the options that were rejected.
+
+**Acceptance Criteria:**
+
+**Given** `docs/decisions/` exists, **Then** it contains an `index.md` listing every ADR with its title and status, and an ADR template defining the standard sections
+
+**Given** the set of major architectural choices, **Then** there is one decision record for each (FR41), covering at minimum: single JWT / no refresh token, in-memory SSE emitter vs. Postgres LISTEN/NOTIFY, raw-SQL row-level locking, Server/Client component boundary, shared Zod schema (validation + inferred types), Drizzle Kit migration workflow, domain-scoped schema files, the `{ error, code }` response shape, integer-cents money representation, and httpOnly-cookie auth token storage
+
+**Given** any decision record, **Then** it documents the options that were considered, the decision that was made, and the rationale for it (FR42)
+
+**Given** decisions the architecture flagged as deliberate tradeoffs (single JWT, in-memory SSE), **Then** the corresponding ADR also describes the production-grade path that was deferred
+
+**Given** the `docs/decisions/index.md`, **When** read, **Then** every ADR file is linked and no listed decision is missing its record
+
+---
+
+### Story 7.2: Concept Docs for Demonstrated Practices
+
+As a reader learning from the codebase,
+I want a concept document for each software engineering practice it demonstrates,
+So that I can understand the practice in context and follow it to an authoritative external source.
+
+**Acceptance Criteria:**
+
+**Given** `docs/concepts/` exists, **Then** it contains an `index.md` listing every concept doc and a concept-doc template defining the standard sections
+
+**Given** the set of demonstrated practices, **Then** there is one concept doc for each (FR43), covering at minimum: the three-level test pyramid, utility-first CSS (Tailwind), the shared-schema pattern (validation + type inference), ORM abstraction limits (raw SQL at the locking boundary), the emitter–subscriber SSE pattern, Server Components by default, and atomic database transactions
+
+**Given** any concept doc, **Then** it explains the practice in the context of where and how C1Pay uses it — pointing to the relevant code — rather than as abstract theory (FR43)
+
+**Given** any concept doc, **Then** it links to at least one authoritative external resource on the practice (FR44)
+
+**Given** the `docs/concepts/index.md`, **When** read, **Then** every concept doc is linked and each entry resolves to a doc that contains at least one external authoritative link
+
+---
