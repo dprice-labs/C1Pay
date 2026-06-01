@@ -1,6 +1,0 @@
-# Team override for bmad-dev-story.
-# Branch hygiene: offer a feature branch before any code is written.
-[workflow]
-activation_steps_append = [
-  "Before making any code changes, check the current git branch (`git branch --show-current`). If HEAD is on the default branch (`main` or `master`), offer to create a dedicated feature branch for this story — suggest a name derived from the story key, e.g. `story/<story-key>` — and create it once the user confirms. If the user declines, note that work will proceed on the current branch. If already on a non-default branch, continue without prompting.",
-]
