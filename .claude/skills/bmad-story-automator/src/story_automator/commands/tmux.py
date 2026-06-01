@@ -5,6 +5,7 @@ import shlex
 import time
 from pathlib import Path
 
+from story_automator.core.runtime_layout import runtime_provider
 from story_automator.core.runtime_policy import PolicyError, load_runtime_policy, step_contract
 from story_automator.core.success_verifiers import resolve_success_contract, run_success_verifier
 from story_automator.core.tmux_runtime import (
@@ -83,7 +84,20 @@ def cmd_tmux_wrapper(args: list[str]) -> int:
         print(agent_type())
         return 0
     if action == "agent-cli":
-        print(agent_cli(agent_type()))
+        rest = args[1:]
+        model = ""
+        idx = 0
+        while idx < len(rest):
+            if rest[idx] == "--model":
+                try:
+                    model = _flag_value(rest, idx, "--model")
+                except PolicyError as exc:
+                    print(str(exc), file=__import__("sys").stderr)
+                    return 1
+                idx += 2
+                continue
+            idx += 1
+        print(agent_cli(agent_type(), model))
         return 0
     if action == "skill-prefix":
         print(skill_prefix(agent_type()))
@@ -102,7 +116,7 @@ def _usage(code: int) -> int:
     print("  kill <session_name>", file=target)
     print("  kill-all [--project-only]", file=target)
     print("  exists <session_name>", file=target)
-    print("  build-cmd <step> <story_id> [--agent TYPE] [--state-file PATH] [extra_instruction]", file=target)
+    print("  build-cmd <step> <story_id> [--agent TYPE] [--model ID] [--state-file PATH] [extra_instruction]", file=target)
     print("  project-slug", file=target)
     print("  project-hash", file=target)
     print("  story-suffix <story_id>", file=target)
@@ -120,7 +134,7 @@ def _spawn(args: list[str]) -> int:
     step, epic, story_id = args[:3]
     command = ""
     cycle = ""
-    agent = agent_type()
+    agent = _raw_agent_selection()
     tail = args[3:]
     for idx, arg in enumerate(tail):
         if arg == "--command" and idx + 1 < len(tail):
@@ -129,11 +143,12 @@ def _spawn(args: list[str]) -> int:
             cycle = tail[idx + 1]
         elif arg == "--agent" and idx + 1 < len(tail):
             agent = tail[idx + 1]
+    root = get_project_root()
+    agent = _resolve_agent_selection(agent, root)
     if not command:
         print("--command is required", file=__import__("sys").stderr)
         return 1
     session = generate_session_name(step, epic, story_id, cycle)
-    root = get_project_root()
     out, code = spawn_session(session, command, agent, root, mode=runtime_mode())
     if code != 0:
         print(out.strip(), file=__import__("sys").stderr)
@@ -153,10 +168,15 @@ def _build_cmd(args: list[str]) -> int:
     tail = args[2:]
     idx = 0
     state_file = ""
+    model = ""
     try:
         while idx < len(tail):
             if tail[idx] == "--agent":
                 agent = _flag_value(tail, idx, "--agent")
+                idx += 2
+                continue
+            if tail[idx] == "--model":
+                model = _flag_value(tail, idx, "--model")
                 idx += 2
                 continue
             if tail[idx] == "--state-file":
@@ -168,9 +188,10 @@ def _build_cmd(args: list[str]) -> int:
     except PolicyError as exc:
         print(str(exc), file=__import__("sys").stderr)
         return 1
-    agent = agent or agent_type()
+    agent = agent or _raw_agent_selection()
     story_prefix = story_id.replace(".", "-")
     root = get_project_root()
+    agent = _resolve_agent_selection(agent, root)
     try:
         policy = load_runtime_policy(root, state_file=state_file)
         contract = step_contract(policy, step)
@@ -178,22 +199,23 @@ def _build_cmd(args: list[str]) -> int:
     except (OSError, PolicyError) as exc:
         print(str(exc), file=__import__("sys").stderr)
         return 1
-    ai_command = os.environ.get("AI_COMMAND")
+    ai_command = os.environ.get("AI_COMMAND", "").strip()
     if ai_command and not os.environ.get("AI_AGENT"):
         cli = ai_command
     elif agent != "codex":
-        cli = agent_cli(agent)
+        cli = agent_cli(agent, model)
     else:
         cli = "codex exec"
     quoted_prompt = shlex.quote(prompt)
     if agent == "codex" and not ai_command:
         codex_home = f"/tmp/sa-codex-home-{project_hash(root)}"
         auth_src = os.path.expanduser("~/.codex/auth.json")
+        model_flag = f" --model {shlex.quote(model)}" if model else ""
         print(
             f'mkdir -p "{codex_home}"'
             + f' && if [ -f "{auth_src}" ]; then ln -sf "{auth_src}" "{codex_home}/auth.json"; fi'
             + f' && CODEX_HOME="{codex_home}" codex exec -s workspace-write -c \'approval_policy="never"\''
-            + f' -c \'model_reasoning_effort="high"\''
+            + f' -c \'model_reasoning_effort="high"\'{model_flag}'
             + f" --disable plugins --disable sqlite --disable shell_snapshot {quoted_prompt}"
         )
     else:
@@ -281,11 +303,11 @@ def cmd_monitor_session(args: list[str]) -> int:
     initial_wait = 5
     timeout_minutes = 60
     json_output = False
-    agent = os.environ.get("AI_AGENT", "claude")
     workflow = "dev"
     story_key = ""
     state_file = ""
     project_root = get_project_root()
+    agent = _raw_agent_selection()
     idx = 1
     while idx < len(args):
         arg = args[idx]
@@ -328,6 +350,7 @@ def cmd_monitor_session(args: list[str]) -> int:
             idx += 2
             continue
         idx += 1
+    agent = _resolve_agent_selection(agent, project_root)
     if agent == "codex":
         timeout_minutes = timeout_minutes * 3 // 2
     time.sleep(max(0, initial_wait))
@@ -454,3 +477,32 @@ def _flag_value(args: list[str], idx: int, flag: str) -> str:
     if idx + 1 >= len(args) or not args[idx + 1].strip() or args[idx + 1].startswith("--"):
         raise PolicyError(f"{flag} requires a value")
     return args[idx + 1]
+
+
+def _raw_agent_selection() -> str:
+    value = os.environ.get("AI_AGENT", "").strip().lower()
+    if not value:
+        inferred = _infer_agent_from_command(os.environ.get("AI_COMMAND", ""))
+        if inferred:
+            return inferred
+    return value if value in {"claude", "codex", "auto", "runtime"} else "auto"
+
+
+def _resolve_agent_selection(agent: str, project_root: str) -> str:
+    value = str(agent or "").strip().lower()
+    if value in {"", "auto", "runtime"}:
+        return runtime_provider(project_root)
+    return value
+def _infer_agent_from_command(command: str) -> str:
+    value = command.strip()
+    if not value:
+        return ""
+    try:
+        executable = Path(shlex.split(value)[0]).name.lower()
+    except ValueError:
+        return ""
+    if "codex" in executable:
+        return "codex"
+    if "claude" in executable:
+        return "claude"
+    return ""
