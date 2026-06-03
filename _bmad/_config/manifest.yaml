@@ -1,65 +1,83 @@
 installation:
-  version: 6.6.0
+  version: 6.8.0
   installDate: 2026-05-13T14:42:21.765Z
-  lastUpdated: 2026-05-13T14:42:21.765Z
+  lastUpdated: 2026-06-01T18:45:16.884Z
 modules:
   - name: core
-    version: 6.6.0
+    version: 6.8.0
     installDate: 2026-05-13T14:42:21.129Z
-    lastUpdated: 2026-05-13T14:42:21.582Z
+    lastUpdated: 2026-06-01T18:45:16.868Z
     source: built-in
     npmPackage: null
     repoUrl: null
   - name: bmm
-    version: 6.6.0
+    version: 6.8.0
     installDate: 2026-05-13T14:42:21.120Z
-    lastUpdated: 2026-05-13T14:42:21.582Z
+    lastUpdated: 2026-06-01T18:45:16.870Z
     source: built-in
     npmPackage: null
     repoUrl: null
-  - name: bmb
-    version: v1.8.0
-    installDate: 2026-05-13T14:42:21.213Z
-    lastUpdated: 2026-05-13T14:42:21.616Z
-    source: external
-    npmPackage: bmad-builder
-    repoUrl: https://github.com/bmad-code-org/bmad-builder
-    channel: stable
-    sha: d64469f61fadc6cfbf2dea6a0a257fe6eb2790a2
-  - name: cis
-    version: v0.2.0
-    installDate: 2026-05-13T14:42:21.255Z
-    lastUpdated: 2026-05-13T14:42:21.654Z
-    source: external
-    npmPackage: bmad-creative-intelligence-suite
-    repoUrl: https://github.com/bmad-code-org/bmad-module-creative-intelligence-suite
-    channel: stable
-    sha: 14a63b893c07173b7a6cfe0fb6a9a72ba51d3cf1
-  - name: gds
-    version: v0.4.0
-    installDate: 2026-05-13T14:42:21.336Z
-    lastUpdated: 2026-05-13T14:42:21.691Z
-    source: external
-    npmPackage: bmad-game-dev-studio
-    repoUrl: https://github.com/bmad-code-org/bmad-module-game-dev-studio
-    channel: stable
-    sha: 07ef779abaafb21fe3a8d80d57cf0b4dc9801d60
   - name: tea
-    version: v1.17.0
+    version: v1.19.0
     installDate: 2026-05-13T14:42:21.458Z
-    lastUpdated: 2026-05-13T14:42:21.727Z
+    lastUpdated: 2026-06-01T18:45:16.874Z
     source: external
     npmPackage: bmad-method-test-architecture-enterprise
     repoUrl: https://github.com/bmad-code-org/bmad-method-test-architecture-enterprise
     channel: stable
-    sha: 4360295a45d8cb55ae89491c8a5fb4b7ac223bf0
-  - name: baut
-    version: v1.14.2
-    installDate: 2026-05-13T14:42:21.518Z
-    lastUpdated: 2026-05-13T14:42:21.765Z
+    sha: 8734d51f24071ddbcb3617390b5fcddb4128ef77
+  - name: bmb
+    version: v1.8.1
+    installDate: 2026-05-13T14:42:21.213Z
+    lastUpdated: 2026-06-01T18:45:16.876Z
+    source: external
+    npmPackage: bmad-builder
+    repoUrl: https://github.com/bmad-code-org/bmad-builder
+    channel: stable
+    sha: 3410d952eafe621f31fcdf4dd5efb2b06690a306
+  - name: cis
+    version: v0.2.1
+    installDate: 2026-05-13T14:42:21.255Z
+    lastUpdated: 2026-06-01T18:45:16.877Z
+    source: external
+    npmPackage: bmad-creative-intelligence-suite
+    repoUrl: https://github.com/bmad-code-org/bmad-module-creative-intelligence-suite
+    channel: stable
+    sha: 07a8dd03d196a762f21c241d985293fe5b0f90e7
+  - name: gds
+    version: v0.6.0
+    installDate: 2026-05-13T14:42:21.336Z
+    lastUpdated: 2026-06-01T18:45:16.879Z
+    source: external
+    npmPackage: bmad-game-dev-studio
+    repoUrl: https://github.com/bmad-code-org/bmad-module-game-dev-studio.git
+    channel: stable
+    sha: 966fbc54db686f77fd0d68cae4164dce8cc98113
+  - name: automator
+    version: main
+    installDate: 2026-06-01T18:45:16.469Z
+    lastUpdated: 2026-06-01T18:45:16.881Z
     source: external
     npmPackage: bmad-story-automator
     repoUrl: https://github.com/bmad-code-org/bmad-automator
+    channel: next
+    sha: 417993deabf2a85eab76c5412799e5abb075e19c
+  - name: wds
+    version: v0.4.3
+    installDate: 2026-06-01T18:45:16.703Z
+    lastUpdated: 2026-06-01T18:45:16.882Z
+    source: external
+    npmPackage: bmad-wds
+    repoUrl: https://github.com/bmad-code-org/bmad-method-wds-expansion
+    channel: stable
+    sha: cc16f09fcfab26d35635af1491f36a38a8431c8d
+  - name: baut
+    version: null
+    installDate: 2026-05-13T14:42:21.518Z
+    lastUpdated: 2026-06-01T18:45:16.884Z
+    source: unknown
+    npmPackage: null
+    repoUrl: null
     channel: stable
     sha: 593f338532ea730b5c1a2dd86681e87b5b4f04dd
 ides:

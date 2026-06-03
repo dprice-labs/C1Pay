@@ -1,7 +1,13 @@
 # Personal config — never commit
 *.user.toml
 .claude/settings.local.json
-_bmad/
+_bmad/*
+_bmad/_config/*
+!_bmad/_config/manifest.yaml
+!_bmad/custom/
+!_bmad/custom/**
+_bmad/custom/**/*.user
+_bmad/custom/*.user
 
 # dependencies
 /node_modules
