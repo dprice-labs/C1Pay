@@ -15,3 +15,11 @@
 - `drizzle.config.ts` has no protection against `drizzle-kit push`; consider `strict: true` or a pre-push hook as a guard (defense-in-depth, not blocking).
 - `drizzle-kit` is in `devDependencies`; `npm run db:migrate` will fail in environments where dev deps are pruned. If migration-on-start is needed in production, move `drizzle-kit` to `dependencies` or use a custom migration runner.
 - `postgres()` constructor error on malformed `DATABASE_URL` propagates as an untyped module-load exception; acceptable for the current project context.
+
+## Deferred from: code review of 1-3-user-registration (2026-06-03)
+
+- No rate limiting on `POST /api/auth/register` — each unauthenticated request burns ~300ms bcrypt CPU; infrastructure-level throttle needed; out of scope for this story.
+- `bcrypt.hash` runs before DB duplicate check in `createUser()` — maximizes CPU cost on duplicate-username flood; the alternative (pre-check + hash) introduces TOCTOU; DB unique constraint is the correct guard; accept the tradeoff.
+- `vitest.config.ts` uses `loadEnv(mode, cwd, '')` (empty prefix) loading all `.env.local` vars including potential production secrets into the Vitest process — deliberate fix for test env; standard Next.js/Vite pattern; reassess if staging secrets ever appear in developer `.env.local`.
+- No username character restrictions (NUL bytes, control characters, RTL Unicode override) — theoretical spoofing/log injection risk; product decision about allowed charset; revisit when building admin or display surfaces.
+- Plaintext password persists in React `useState` if navigation after successful registration is interrupted — component unmount clears state; no route guards exist yet to cause this; theoretical risk only.

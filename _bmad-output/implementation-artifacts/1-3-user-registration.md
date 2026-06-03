@@ -83,6 +83,34 @@ _Note: confirm password is UI-only — `POST /api/auth/register` receives a sing
   - [x] Tear down postgres client in `afterAll`: `await globalThis._pgClient?.end()`
   - [x] Run `npm run test:integration` — must pass
 
+### Review Findings
+
+#### Decision Needed
+
+- [ ] [Review][Decision] Password length bounds undefined — `z.string().min(1)` accepts single-char passwords and has no max; bcrypt silently truncates inputs >72 bytes (a 100-char password authenticates with its first 72 chars) — decide minimum (e.g. 8) and enforce max 72 [src/lib/schemas.ts:5]
+- [ ] [Review][Decision] Username logged on every registration — `log.info(\`User created: ${username}\`)` writes every new username to logs; decide: keep for audit trail (and sanitize against log injection) or remove [src/lib/users.ts:17]
+
+#### Patches
+
+- [ ] [Review][Patch] Unhandled `request.json()` SyntaxError crashes route on malformed/empty body [src/app/api/auth/register/route.ts:6]
+- [ ] [Review][Patch] `createUser` missing guard on `.returning()` result — can silently return `undefined`, causing 500 in route handler [src/lib/users.ts:13-16]
+- [ ] [Review][Patch] Duplicate-key detection uses fragile string regex instead of stable Postgres error code `23505` [src/lib/users.ts:21-25]
+- [ ] [Review][Patch] Whitespace-only username (e.g. `"   "`) passes Zod validation and persists to DB [src/lib/schemas.ts:4]
+- [ ] [Review][Patch] `res.json()` called unconditionally on non-ok response — throws on non-JSON error body (e.g. HTML 500 page), silently leaving no user feedback [src/app/(auth)/register/RegisterForm.tsx:36]
+- [ ] [Review][Patch] `globalThis._pgClient` not reset to `undefined` after `.end()` — second test suite reuses the terminated client [tests/integration/auth.test.ts]
+- [ ] [Review][Patch] `noValidate` + no pre-fetch empty-field guard — empty username/password bypass the confirm-password check and are sent to the server [src/app/(auth)/register/RegisterForm.tsx]
+- [ ] [Review][Patch] Enter key triggers double-submit — `if (isLoading) return` missing at `handleSubmit` entry [src/app/(auth)/register/RegisterForm.tsx]
+- [ ] [Review][Patch] WCAG: error paragraph missing `aria-invalid`/`aria-describedby` on inputs; alert region conditionally unmounts preventing same-error re-announcement [src/app/(auth)/register/RegisterForm.tsx:84]
+- [ ] [Review][Patch] Unexpected DB errors silently re-thrown without logging — lose the stack trace on pool exhaustion or connection failures [src/lib/users.ts:27-28]
+
+#### Deferred
+
+- [x] [Review][Defer] No rate limiting on `/api/auth/register` — DoS/abuse vector via bcrypt CPU cost; infrastructure-level, out of scope for this story [src/app/api/auth/register/route.ts]
+- [x] [Review][Defer] `bcrypt.hash` runs before DB duplicate check — maximizes CPU cost on duplicate-username flood; fixing with pre-check introduces TOCTOU; DB constraint is the correct guard [src/lib/users.ts:11]
+- [x] [Review][Defer] `vitest.config.ts` `loadEnv(mode, cwd, '')` loads all `.env.local` vars including any production secrets — deliberate fix for test env; standard pattern; reassess if staging secrets appear in local `.env.local` [vitest.config.ts:10]
+- [x] [Review][Defer] No username character restrictions (NUL bytes, control chars, RTL override) — theoretical spoofing/injection risk; product decision about allowed characters [src/lib/schemas.ts:4]
+- [x] [Review][Defer] Plaintext password persists in React state if navigation is interrupted — component unmount clears state; theoretical risk only; no route guards exist yet [src/app/(auth)/register/RegisterForm.tsx]
+
 ## Dev Notes
 
 ### Packages to install
