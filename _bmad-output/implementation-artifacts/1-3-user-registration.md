@@ -4,7 +4,7 @@ baseline_commit: e86f77417cdc972303c4577a80e1cb7adefcd36c
 
 # Story 1.3: User Registration
 
-Status: review
+Status: in-progress
 
 ## Story
 

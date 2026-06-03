@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-03  # story 1.3 complete
+last_updated: 2026-06-03  # story 1.3 review findings recorded
 project: C1Pay
 
 
@@ -49,7 +49,7 @@ development_status:
   epic-1: in-progress
   1-1-project-scaffold-and-infrastructure: done
   1-2-database-foundation: done
-  1-3-user-registration: review
+  1-3-user-registration: in-progress
   1-4-user-login-and-session: backlog
   1-5-route-protection-and-logout: backlog
   epic-1-retrospective: optional
