@@ -3,7 +3,12 @@ import { createUser } from '@/lib/users'
 import { AppError, errorResponse } from '@/lib/errors'
 
 export async function POST(request: Request) {
-  const body = await request.json()
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return errorResponse('Validation failed', 'VALIDATION_ERROR', 400)
+  }
   const parsed = registerSchema.safeParse(body)
   if (!parsed.success) {
     return errorResponse('Validation failed', 'VALIDATION_ERROR', 400)
