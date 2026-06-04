@@ -23,3 +23,9 @@
 - `vitest.config.ts` uses `loadEnv(mode, cwd, '')` (empty prefix) loading all `.env.local` vars including potential production secrets into the Vitest process — deliberate fix for test env; standard Next.js/Vite pattern; reassess if staging secrets ever appear in developer `.env.local`.
 - No username character restrictions (NUL bytes, control characters, RTL Unicode override) — theoretical spoofing/log injection risk; product decision about allowed charset; revisit when building admin or display surfaces.
 - Plaintext password persists in React `useState` if navigation after successful registration is interrupted — component unmount clears state; no route guards exist yet to cause this; theoretical risk only.
+
+## Deferred from: code review of 1-3-user-registration patch review (2026-06-04)
+
+- `bcrypt.hash` is called outside `createUser`'s `try/catch`; a bcrypt failure (e.g. OOM) escapes the catch block without logging — route handler outer catch still returns 500. Pre-existing; fix when hardening error observability.
+- `db-schema.test.ts` missing `globalThis._pgClient = undefined` in `afterAll` — pre-existing asymmetry with the `auth.test.ts` fix; address in a test-cleanup pass.
+- `log.error` in `createUser` includes `error.message`, which the Postgres driver may format with query values containing the username or other PII; requires driver-level investigation.

@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+const ERROR_ID = 'register-error'
+
 export default function RegisterForm() {
   const router = useRouter()
   const [username, setUsername] = useState('')
@@ -13,7 +15,19 @@ export default function RegisterForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (isLoading) return
+
     setError(null)
+
+    if (!username.trim() || !password) {
+      setError('Username and password are required')
+      return
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match')
@@ -33,7 +47,13 @@ export default function RegisterForm() {
         return
       }
 
-      const data = await res.json()
+      let data: { code?: string } = {}
+      try {
+        data = await res.json()
+      } catch {
+        // non-JSON error body (e.g. HTML 500 page)
+      }
+
       if (data.code === 'USERNAME_TAKEN') {
         setError('Username already taken')
       } else if (data.code === 'VALIDATION_ERROR') {
@@ -46,6 +66,9 @@ export default function RegisterForm() {
     }
   }
 
+  const isPasswordMismatch = error === 'Passwords do not match'
+  const hasUsernameOrPasswordError = error !== null && !isPasswordMismatch
+
   return (
     <form onSubmit={handleSubmit} noValidate>
       <div>
@@ -57,6 +80,8 @@ export default function RegisterForm() {
           onChange={(e) => setUsername(e.target.value)}
           autoComplete="username"
           required
+          aria-invalid={hasUsernameOrPasswordError || undefined}
+          aria-describedby={hasUsernameOrPasswordError ? ERROR_ID : undefined}
         />
       </div>
       <div>
@@ -68,6 +93,8 @@ export default function RegisterForm() {
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="new-password"
           required
+          aria-invalid={hasUsernameOrPasswordError || undefined}
+          aria-describedby={hasUsernameOrPasswordError ? ERROR_ID : undefined}
         />
       </div>
       <div>
@@ -79,9 +106,18 @@ export default function RegisterForm() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           autoComplete="new-password"
           required
+          aria-invalid={isPasswordMismatch || undefined}
+          aria-describedby={isPasswordMismatch ? ERROR_ID : undefined}
         />
       </div>
-      {error && <p role="alert">{error}</p>}
+      <p
+        id={ERROR_ID}
+        aria-live="assertive"
+        aria-atomic="true"
+        style={{ minHeight: '1em' }}
+      >
+        {error ?? ''}
+      </p>
       <button type="submit" disabled={isLoading}>
         {isLoading ? 'Creating account…' : 'Create account'}
       </button>

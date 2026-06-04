@@ -4,7 +4,7 @@ baseline_commit: e86f77417cdc972303c4577a80e1cb7adefcd36c
 
 # Story 1.3: User Registration
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -110,6 +110,24 @@ _Note: confirm password is UI-only — `POST /api/auth/register` receives a sing
 - [x] [Review][Defer] `vitest.config.ts` `loadEnv(mode, cwd, '')` loads all `.env.local` vars including any production secrets — deliberate fix for test env; standard pattern; reassess if staging secrets appear in local `.env.local` [vitest.config.ts:10]
 - [x] [Review][Defer] No username character restrictions (NUL bytes, control chars, RTL override) — theoretical spoofing/injection risk; product decision about allowed characters [src/lib/schemas.ts:4]
 - [x] [Review][Defer] Plaintext password persists in React state if navigation is interrupted — component unmount clears state; theoretical risk only; no route guards exist yet [src/app/(auth)/register/RegisterForm.tsx]
+
+### Review Findings (Round 2 — 2026-06-04)
+
+#### Patches
+
+- [x] [Review][Patch] Zod trim order: `.min(1).trim()` should be `.trim().min(1)` — whitespace-only username (e.g. `"   "`) passes `min(1)` then trims to `""`, storing an empty string as username in DB [src/lib/schemas.ts:4]
+- [x] [Review][Patch] `aria-invalid` driven by global `hasError` — marks both username and password invalid for all error types (including "Passwords do not match"), and confirm-password input gets no `aria-invalid` or `aria-describedby` [src/app/(auth)/register/RegisterForm.tsx:77,90]
+- [x] [Review][Patch] `aria-live="assertive"` on always-rendered empty `<p>` announces empty string on page load in some screen readers [src/app/(auth)/register/RegisterForm.tsx:105]
+- [x] [Review][Patch] Password `min(8)` not surfaced in client UI — 1–7 char password passes client guard, hits API, returns `VALIDATION_ERROR`, UI shows misleading "Username and password are required" [src/app/(auth)/register/RegisterForm.tsx:22]
+- [x] [Review][Patch] `Object.assign(process.env, loadEnv(...))` overwrites existing env vars — CI-injected `DATABASE_URL` silently replaced by `.env.local` value [drizzle.config.ts:3]
+- [x] [Review][Patch] No unit test for `rows[0]` undefined case — new `INTERNAL_ERROR` guard has zero coverage [tests/unit/lib/users.test.ts]
+- [x] [Review][Patch] No test for password `max(72)` boundary [tests/unit/lib/users.test.ts]
+
+#### Deferred
+
+- [x] [Review][Defer] `bcrypt.hash` outside try/catch — failure escapes `createUser`'s catch block without logging; pre-existing [src/lib/users.ts:11]
+- [x] [Review][Defer] `db-schema.test.ts` missing `globalThis._pgClient = undefined` cleanup — pre-existing asymmetry with `auth.test.ts` fix [tests/integration/db-schema.test.ts]
+- [x] [Review][Defer] `log.error` may embed PII — Postgres error message can include query values containing the username [src/lib/users.ts:32]
 
 ## Dev Notes
 

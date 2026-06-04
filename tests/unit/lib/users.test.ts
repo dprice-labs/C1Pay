@@ -55,12 +55,58 @@ describe('createUser', () => {
   })
 
   it('throws AppError USERNAME_TAKEN on duplicate username', async () => {
-    mockReturning.mockRejectedValueOnce(
-      new Error('duplicate key value violates unique constraint')
-    )
+    const pgError = Object.assign(new Error('duplicate key'), { code: '23505' })
+    mockReturning.mockRejectedValueOnce(pgError)
     await expect(createUser('alice', 'pass')).rejects.toMatchObject({
       code: 'USERNAME_TAKEN',
       status: 409,
     })
+  })
+
+  it('throws AppError USERNAME_TAKEN when error code is on .cause (Drizzle wrapping)', async () => {
+    const cause = Object.assign(new Error('duplicate key'), { code: '23505' })
+    const drizzleError = Object.assign(new Error('DrizzleQueryError'), { cause })
+    mockReturning.mockRejectedValueOnce(drizzleError)
+    await expect(createUser('alice', 'pass')).rejects.toMatchObject({
+      code: 'USERNAME_TAKEN',
+      status: 409,
+    })
+  })
+
+  it('throws AppError INTERNAL_ERROR when .returning() resolves to empty array', async () => {
+    mockReturning.mockResolvedValueOnce([])
+    await expect(createUser('alice', 'password123')).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
+      status: 500,
+    })
+  })
+})
+
+import { registerSchema } from '@/lib/schemas'
+
+describe('registerSchema', () => {
+  it('rejects password shorter than 8 characters', () => {
+    const result = registerSchema.safeParse({ username: 'alice', password: 'short' })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts password exactly 8 characters', () => {
+    const result = registerSchema.safeParse({ username: 'alice', password: 'exactly8' })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts password exactly 72 characters', () => {
+    const result = registerSchema.safeParse({ username: 'alice', password: 'a'.repeat(72) })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects password longer than 72 characters', () => {
+    const result = registerSchema.safeParse({ username: 'alice', password: 'a'.repeat(73) })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects whitespace-only username after trim', () => {
+    const result = registerSchema.safeParse({ username: '   ', password: 'password123' })
+    expect(result.success).toBe(false)
   })
 })

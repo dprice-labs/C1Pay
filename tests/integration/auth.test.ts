@@ -9,6 +9,7 @@ const TEST_USERNAME = '__integration_test_auth__'
 
 afterAll(async () => {
   await globalThis._pgClient?.end()
+  globalThis._pgClient = undefined
 })
 
 afterEach(async () => {
