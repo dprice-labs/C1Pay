@@ -1,5 +1,3 @@
-# C1Pay
-
 <p align="center">
   <img src="./C1Pay.jpg" alt="C1Pay Full-Stack Architecture Diagram" width="800">
 </p>
