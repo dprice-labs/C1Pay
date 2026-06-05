@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs'
+import { eq } from 'drizzle-orm'
 import { db } from '@/db/index'
 import { users } from '@/db/schema/users'
 import { AppError } from '@/lib/errors'
@@ -6,6 +7,11 @@ import { createLogger } from '@/lib/logger'
 import type { User } from '@/db/schema/users'
 
 const log = createLogger('users')
+
+export async function findByUsername(username: string): Promise<User | undefined> {
+  const [user] = await db.select().from(users).where(eq(users.username, username))
+  return user
+}
 
 export async function createUser(username: string, password: string): Promise<User> {
   const passwordHash = await bcrypt.hash(password, 12)
