@@ -1,5 +1,9 @@
 # C1Pay
 
+<p align="center">
+  <img src="./C1Pay.jpg" alt="C1Pay Full-Stack Architecture Diagram" width="800">
+</p>
+
 A Venmo/Zelle-style sandbox web app built as a team knowledge-sharing reference codebase. The goal is to demonstrate full-stack software development best practices for a mid-level to senior developer audience — not production software, but a deliberate teaching artifact where every decision is worth examining.
 
 ## What it demonstrates
