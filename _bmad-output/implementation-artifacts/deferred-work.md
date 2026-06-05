@@ -24,6 +24,16 @@
 - No username character restrictions (NUL bytes, control characters, RTL Unicode override) — theoretical spoofing/log injection risk; product decision about allowed charset; revisit when building admin or display surfaces.
 - Plaintext password persists in React `useState` if navigation after successful registration is interrupted — component unmount clears state; no route guards exist yet to cause this; theoretical risk only.
 
+## Deferred from: code review of 1-4-user-login-and-session (2026-06-05)
+
+- No logout/session invalidation — JWTs are stateless and live for 24h; no server-side revocation exists. Explicit sign-out route is Story 1.5 scope.
+- `loginSchema` has no `max()` on password — bcrypt silently truncates at 72 bytes; a large body passes Zod and calls bcrypt; body-size limit and rate limiting are already deferred infrastructure concerns.
+- `isLoading` double-submit race — two programmatic `form.submit()` calls fired before the first `setIsLoading(true)` re-render can both pass the guard and fire concurrent fetches. Not triggerable by normal user interaction.
+- `getAuthUser` untested — relies on `cookies()` from `next/headers` which requires the Next.js request context; unit testing requires runtime mocking infrastructure not yet set up.
+- `findByUsername` case sensitivity — `eq(users.username, username)` is a case-sensitive exact match; username case normalisation is a product-level decision, not a bug introduced by this story.
+- `getAuthUser` swallows all JWT errors identically without logging cause — expired, tampered, and wrong-algorithm tokens all become `UNAUTHORIZED 401` with no forensic log entry; observability improvement deferred.
+- `router.push('/')` executes before browser confirms cookie write — inherent property of cookie-based SPA navigation; cookies are set in the response headers and flushed by the browser before the navigated page fires its first request in practice.
+
 ## Deferred from: code review of 1-3-user-registration patch review (2026-06-04)
 
 - `bcrypt.hash` is called outside `createUser`'s `try/catch`; a bcrypt failure (e.g. OOM) escapes the catch block without logging — route handler outer catch still returns 500. Pre-existing; fix when hardening error observability.

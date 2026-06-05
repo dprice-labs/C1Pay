@@ -3,7 +3,8 @@ import { db } from '@/db/index'
 import { users } from '@/db/schema/users'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
-import { createUser } from '@/lib/users'
+import { createUser, findByUsername } from '@/lib/users'
+import { verifyPassword } from '@/lib/auth'
 
 const TEST_USERNAME = '__integration_test_auth__'
 
@@ -37,5 +38,29 @@ describe('createUser', () => {
     await expect(createUser(TEST_USERNAME, 'secondpassword')).rejects.toMatchObject({
       code: 'USERNAME_TAKEN',
     })
+  })
+})
+
+describe('findByUsername + verifyPassword', () => {
+  it('returns the user for an existing username', async () => {
+    await createUser(TEST_USERNAME, 'testpassword')
+    const user = await findByUsername(TEST_USERNAME)
+    expect(user).toBeDefined()
+    expect(user!.username).toBe(TEST_USERNAME)
+  })
+
+  it('returns undefined for a non-existent username', async () => {
+    const user = await findByUsername('__does_not_exist_1234__')
+    expect(user).toBeUndefined()
+  })
+
+  it('verifyPassword returns true for the correct password', async () => {
+    const user = await createUser(TEST_USERNAME, 'testpassword')
+    expect(await verifyPassword('testpassword', user.passwordHash)).toBe(true)
+  })
+
+  it('verifyPassword returns false for an incorrect password', async () => {
+    const user = await createUser(TEST_USERNAME, 'testpassword')
+    expect(await verifyPassword('wrongpassword', user.passwordHash)).toBe(false)
   })
 })
