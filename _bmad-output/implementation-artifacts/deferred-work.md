@@ -39,3 +39,8 @@
 - `bcrypt.hash` is called outside `createUser`'s `try/catch`; a bcrypt failure (e.g. OOM) escapes the catch block without logging — route handler outer catch still returns 500. Pre-existing; fix when hardening error observability.
 - `db-schema.test.ts` missing `globalThis._pgClient = undefined` in `afterAll` — pre-existing asymmetry with the `auth.test.ts` fix; address in a test-cleanup pass.
 - `log.error` in `createUser` includes `error.message`, which the Postgres driver may format with query values containing the username or other PII; requires driver-level investigation.
+
+## Deferred from: code review of 1-5-route-protection-and-logout (2026-06-08)
+
+- No `aria-live`/loading-state announcement during the brief logout transition (`LogoutButton.tsx`) — pre-existing, deliberate spec decision (Dev Notes explicitly reasoned "no aria-live region needed... there's no error state to announce"); revisit only if a future a11y audit (Epic 6) flags the loading-state transition specifically.
+- `e2e_user_${Date.now()}` username generation in `tests/e2e/auth.spec.ts` risks collisions once the e2e suite grows to multiple specs running in parallel — pre-existing pattern, no current collision risk with a single test; switch to a more collision-resistant generator (e.g. worker index + random suffix) when additional e2e specs are added.
