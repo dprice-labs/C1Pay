@@ -13,6 +13,15 @@ export async function findByUsername(username: string): Promise<User | undefined
   return user
 }
 
+export async function getUserById(id: number): Promise<User> {
+  const [user] = await db.select().from(users).where(eq(users.id, id))
+  if (!user) {
+    log.warn(`getUserById: no user found for id=${id}`)
+    throw new AppError('User not found', 'USER_NOT_FOUND', 404)
+  }
+  return user
+}
+
 export async function createUser(username: string, password: string): Promise<User> {
   const passwordHash = await bcrypt.hash(password, 12)
   try {

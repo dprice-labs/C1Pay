@@ -40,6 +40,12 @@
 - `db-schema.test.ts` missing `globalThis._pgClient = undefined` in `afterAll` — pre-existing asymmetry with the `auth.test.ts` fix; address in a test-cleanup pass.
 - `log.error` in `createUser` includes `error.message`, which the Postgres driver may format with query values containing the username or other PII; requires driver-level investigation.
 
+## Deferred from: code review of 2-1-protected-layout-and-zustand-foundation (2026-06-09)
+
+- No error boundary under `src/app/(protected)/` — unhandled `AppError` from `getAuthUser()` or `getUserById()` (DB unreachable, deleted user replaying JWT) produces a hard 500 with no `/login` redirect; needs an `error.tsx` boundary.
+- `getUserById` returns full `User` type including `passwordHash` — only `balanceCents` is used today; a future refactor passing `user` to the client could accidentally serialize the hash. Consider a projected return type when building user-facing profile data.
+- No unit tests for `getUserById` service function — warn+throw path is untested in isolation; add when doing a service-layer test hardening pass.
+
 ## Deferred from: code review of 1-5-route-protection-and-logout (2026-06-08)
 
 - No `aria-live`/loading-state announcement during the brief logout transition (`LogoutButton.tsx`) — pre-existing, deliberate spec decision (Dev Notes explicitly reasoned "no aria-live region needed... there's no error state to announce"); revisit only if a future a11y audit (Epic 6) flags the loading-state transition specifically.
