@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-08  # story 1.5 code review complete — moved to done
+last_updated: 2026-06-09  # story 2.1 done
 project: C1Pay
 
 
@@ -55,8 +55,8 @@ development_status:
   epic-1-retrospective: optional
 
   # ── Epic 2: Home Screen & Real-Time Foundation ───────────────────────────────
-  epic-2: backlog
-  2-1-protected-layout-and-zustand-foundation: backlog
+  epic-2: in-progress
+  2-1-protected-layout-and-zustand-foundation: done
   2-2-home-screen-ui: backlog
   2-3-sse-connection-and-real-time-updates: backlog
   epic-2-retrospective: optional
