@@ -3,9 +3,7 @@
 import { useRef } from 'react'
 import { useBalanceStore } from '@/store/balance'
 import { useRequestStore } from '@/store/requests'
-// Story 2.3: import { useSSE } from '@/hooks/use-sse' and call useSSE() here
-// This hook opens an EventSource to /api/sse and dispatches BALANCE_UPDATED /
-// REQUEST_RECEIVED / REQUEST_RESOLVED events to the Zustand stores above.
+import { useSSE } from '@/hooks/use-sse'
 
 interface ProvidersProps {
   children: React.ReactNode
@@ -20,6 +18,8 @@ export default function Providers({ children, initialBalance, initialPendingCoun
     useRequestStore.getState().setPendingCount(initialPendingCount)
     seeded.current = true
   }
+
+  useSSE()
 
   return <>{children}</>
 }
