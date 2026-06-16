@@ -30,27 +30,26 @@ test('SSE connection to /api/sse is opened when the protected home page loads', 
   expect(sseRequest.method()).toBe('GET')
 })
 
-test('EventSource auto-reconnects after /api/sse route is temporarily blocked', async ({ page }) => {
+test('EventSource reconnects with HTTP 200 after a network interruption', async ({ page }) => {
   const username = `sse_reconnect_${Date.now()}`
   const password = 'password123'
 
   await registerAndLogin(page, username, password)
 
-  // Wait for the initial SSE connection
+  // Confirm initial SSE connection established
   await page.waitForRequest((req) => req.url().includes('/api/sse'))
 
-  // Block the SSE route to simulate a network interruption
-  await page.route('**/api/sse', (route) => route.abort())
+  // Register response listener before triggering the drop so we don't miss the reconnect
+  const reconnectResponsePromise = page.waitForResponse(
+    (resp) => resp.url().includes('/api/sse') && resp.status() === 200,
+    { timeout: 15000 },
+  )
 
-  // Wait for EventSource to attempt reconnect (aborted connections trigger immediate retry)
-  const reconnectPromise = page.waitForRequest((req) => req.url().includes('/api/sse'), {
-    timeout: 10000,
-  })
+  // Briefly take the network offline then restore — drops the SSE connection with a single
+  // error event (errorStreak = 1, below the 3-cap), then EventSource reconnects on restore.
+  await page.context().setOffline(true)
+  await page.context().setOffline(false)
 
-  // Unblock the route
-  await page.unrouteAll()
-
-  // Verify the EventSource reconnected
-  const reconnectRequest = await reconnectPromise
-  expect(reconnectRequest.url()).toContain('/api/sse')
+  const reconnectResponse = await reconnectResponsePromise
+  expect(reconnectResponse.status()).toBe(200)
 })

@@ -50,3 +50,13 @@
 
 - No `aria-live`/loading-state announcement during the brief logout transition (`LogoutButton.tsx`) — pre-existing, deliberate spec decision (Dev Notes explicitly reasoned "no aria-live region needed... there's no error state to announce"); revisit only if a future a11y audit (Epic 6) flags the loading-state transition specifically.
 - `e2e_user_${Date.now()}` username generation in `tests/e2e/auth.spec.ts` risks collisions once the e2e suite grows to multiple specs running in parallel — pre-existing pattern, no current collision risk with a single test; switch to a more collision-resistant generator (e.g. worker index + random suffix) when additional e2e specs are added.
+
+## Deferred from: code review of 2-3-sse-connection-and-real-time-updates (2026-06-16)
+
+- Single writer per user: a second tab silently evicts the first tab's SSE connection (`src/lib/sse-emitter.ts`). Architectural decision per Map<userId, writer> spec; closing the old writer on replace is already better than the spec pattern. Revisit if multi-tab support is required.
+- `pendingCount` can drift if SSE events are missed during a connection drop — no server-authoritative count sent on reconnect. Dev Notes explicitly defer reconciliation to Story 4.5.
+- No `aria-live` regions for real-time balance and inbox badge updates from SSE events. Deferred to Epic 6 (Accessibility).
+- Concurrent `emit()` calls for the same `userId` are not serialized; `WritableStreamDefaultWriter` requires sequenced writes. Low risk given current app design; revisit in Epic 3 when `emit()` is actively called from transaction handlers.
+- No SSE heartbeat/comment ping — reverse proxies (nginx, AWS ALB) will silently kill idle SSE connections after ~60 s. Infrastructure concern outside Story 2.3 scope.
+- `REQUEST_RECEIVED` event payload (requestId, fromUsername, amountCents, note) is silently discarded by the hook listener. Dev Notes explicitly defer payload use to Story 4.5.
+- `globalThis.__sseWriters` holds stale writer references after Next.js dev hot-reload until first `emit()` fails and triggers deregister. Dev-only concern; harmless in production.

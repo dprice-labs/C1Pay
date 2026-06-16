@@ -4,7 +4,7 @@ baseline_commit: 678ea0c
 
 # Story 2.3: SSE Connection & Real-Time Updates
 
-Status: review
+Status: done
 
 ## Story
 
@@ -24,7 +24,7 @@ so that changes initiated by other users are immediately visible to me.
 
 5. **Given** `useSSE` receives a `REQUEST_RECEIVED` or `REQUEST_RESOLVED` event, **When** dispatched, **Then** it calls `useRequestStore.getState().setPendingCount()` with the updated count
 
-6. **Given** the SSE connection drops due to network interruption, **When** connectivity is restored, **Then** the browser's `EventSource` reconnects automatically without user action (FR29)
+6. **Given** the SSE connection drops due to network interruption, **When** connectivity is restored, **Then** the browser's `EventSource` reconnects automatically without user action (FR29) — _Note: implementation intentionally adds a 3-consecutive-error cap to prevent hammering `/api/sse` with 401s on expired sessions. This deviates from the "no custom reconnect mechanism" note in FR29 by design; the cap resets on each successful open so transient errors do not accumulate._
 
 7. **Given** an e2e test for the SSE infrastructure, **When** run, **Then** it verifies the connection opens on page load, and reconnects after being dropped
 
@@ -315,6 +315,20 @@ claude-sonnet-4-6
 - `src/app/(protected)/Providers.tsx` (modified)
 - `tests/e2e/sse.spec.ts` (new)
 
+## Review Findings
+
+- [x] [Review][Decision] Error-streak circuit-breaker (`source.close()` after 3 errors) contradicts FR29 — Resolved: keep the cap; AC6 note updated to document the intentional deviation; inline comment in `use-sse.ts` updated.
+- [x] [Review][Patch] REQUEST_RECEIVED/RESOLVED use `useRequestStore.setState()` instead of `setPendingCount()` [src/hooks/use-sse.ts:21-23] — Fixed: updated to `useRequestStore.getState().setPendingCount()` per AC5.
+- [x] [Review][Patch] E2E reconnect test weak assertion and race with 3-error cap [tests/e2e/sse.spec.ts:40-55] — Fixed: replaced `page.route/waitForRequest/unrouteAll` pattern with `page.context().setOffline()` + `waitForResponse` asserting HTTP 200.
+- [x] [Review][Defer] Single writer per user — second tab silently evicts first tab's SSE connection [src/lib/sse-emitter.ts:16] — deferred, pre-existing architectural design per Map<userId, WritableStreamDefaultWriter> spec; closing old writer on replace is an improvement over the spec's simple overwrite.
+- [x] [Review][Defer] `pendingCount` can drift if SSE events are missed — no server-authoritative reconciliation on reconnect [src/hooks/use-sse.ts:20-23] — deferred, pre-existing; Dev Notes explicitly defer reconciliation to Story 4.5.
+- [x] [Review][Defer] No `aria-live` region for real-time balance / inbox badge updates — deferred, pre-existing; SSE infrastructure only; accessibility wiring deferred to Epic 6.
+- [x] [Review][Defer] Concurrent `emit()` calls for same userId not serialized — WritableStreamDefaultWriter requires sequenced writes [src/lib/sse-emitter.ts:31] — deferred, pre-existing; unlikely in current app design; revisit in Epic 3 when emit is actively called.
+- [x] [Review][Defer] No SSE heartbeat — reverse proxies will silently kill idle connections after ~60 s — deferred, pre-existing; infrastructure concern outside Story 2.3 scope.
+- [x] [Review][Defer] REQUEST_RECEIVED event payload silently discarded (requestId, fromUsername, etc.) [src/hooks/use-sse.ts:20] — deferred, pre-existing; Dev Notes explicitly defer payload use to Story 4.5.
+- [x] [Review][Defer] `globalThis.__sseWriters` holds stale writers after dev hot-reload until first emit fails [src/lib/sse-emitter.ts:13] — deferred, pre-existing; dev-only concern; harmless in production.
+
 ## Change Log
 
 - 2026-06-11: Implemented Story 2.3 — SSE infrastructure wired end-to-end: emitter singleton, GET /api/sse route, useSSE hook, Providers integration, e2e tests.
+- 2026-06-16: Code review complete — 1 decision-needed, 2 patch, 7 deferred, 8 dismissed.

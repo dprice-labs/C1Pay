@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-11  # story 2.3 review
+last_updated: 2026-06-16  # story 2.3 done
 project: C1Pay
 
 
@@ -58,7 +58,7 @@ development_status:
   epic-2: in-progress
   2-1-protected-layout-and-zustand-foundation: done
   2-2-home-screen-ui: done
-  2-3-sse-connection-and-real-time-updates: review
+  2-3-sse-connection-and-real-time-updates: done
   epic-2-retrospective: optional
 
   # ── Epic 3: Send Money & Transaction History ──────────────────────────────────

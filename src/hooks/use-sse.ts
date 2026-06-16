@@ -18,15 +18,18 @@ export function useSSE(): void {
     })
 
     source.addEventListener('REQUEST_RECEIVED', () => {
-      useRequestStore.setState(s => ({ pendingCount: s.pendingCount + 1 }))
+      const { pendingCount } = useRequestStore.getState()
+      useRequestStore.getState().setPendingCount(pendingCount + 1)
     })
 
     source.addEventListener('REQUEST_RESOLVED', () => {
-      useRequestStore.setState(s => ({ pendingCount: Math.max(0, s.pendingCount - 1) }))
+      const { pendingCount } = useRequestStore.getState()
+      useRequestStore.getState().setPendingCount(Math.max(0, pendingCount - 1))
     })
 
-    // Close after 3 consecutive errors to prevent hammering the server on permanent
-    // failures (e.g. expired session returning 401). Resets on successful open.
+    // Intentional deviation from FR29: close after 3 consecutive errors to prevent
+    // hammering /api/sse with 401s on expired sessions. Native EventSource would retry
+    // forever. Resets on successful open (transient errors don't accumulate).
     let errorStreak = 0
     source.onerror = () => { if (++errorStreak >= 3) source.close() }
     source.addEventListener('open', () => { errorStreak = 0 })
