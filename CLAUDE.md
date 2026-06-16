@@ -1,5 +1,10 @@
 # C1Pay
 
+## Git Workflow
+
+- **Always create a branch for every story** before making any code changes. Name it `story/<story-id>-<slug>` (e.g. `story/2-3-sse-connection-and-real-time-updates`).
+- **Never commit directly to `main`.** All work goes through a branch and PR.
+
 ## UI Component Library
 
 This project uses **shadcn/ui with Base UI primitives** (`@base-ui/react`) — not Radix UI. The style is `base-nova`.
