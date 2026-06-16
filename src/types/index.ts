@@ -11,14 +11,7 @@ export interface User {
   createdAt: string
 }
 
-export interface Transaction {
-  id: number
-  senderId: number
-  recipientId: number
-  amountCents: number
-  note: string | null
-  createdAt: string
-}
+export type { Transaction } from '@/db/schema/transactions'
 
 export interface PaymentRequest {
   id: number
