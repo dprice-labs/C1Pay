@@ -60,3 +60,13 @@
 - No SSE heartbeat/comment ping — reverse proxies (nginx, AWS ALB) will silently kill idle SSE connections after ~60 s. Infrastructure concern outside Story 2.3 scope.
 - `REQUEST_RECEIVED` event payload (requestId, fromUsername, amountCents, note) is silently discarded by the hook listener. Dev Notes explicitly defer payload use to Story 4.5.
 - `globalThis.__sseWriters` holds stale writer references after Next.js dev hot-reload until first `emit()` fails and triggers deregister. Dev-only concern; harmless in production.
+
+## Deferred from: code review of 3-1-transactions-schema-and-atomic-send-service (2026-06-16)
+
+- Stale in-memory balance write: `sendMoney` reads balance with `FOR UPDATE`, then writes `senderRow.balance_cents - amountCents` from application memory. Correct under PostgreSQL READ COMMITTED (FOR UPDATE blocks concurrent writers for the transaction's duration), but a SQL expression (`SET balance_cents = balance_cents - $amount`) would be unconditionally safe. Revisit in a service-hardening pass.
+- No guard against recipient balance exceeding PostgreSQL INT4 max (~2.1B cents). DB rejects atomically but without a clean `AppError`. Unreachable at training-app scale; revisit if scale changes.
+- `amountCents` has no upper bound check in `sendMoney`. Out of story scope; `INSUFFICIENT_BALANCE` implicitly constrains viable amounts.
+- Multi-hop deadlock possible with 3+ users in a chain (A→B, B→C, C→A). `ORDER BY id` prevents pairwise deadlock only. Architectural decision acknowledged in story notes; not a concern at training-app scale.
+- `note` field in `transactions` table has no length constraint. No story requirement for max length; address if note becomes a user-facing field with display constraints.
+- Concurrent sends test asserts exactly 1 success / 1 failure — flaky under SERIALIZABLE isolation. PostgreSQL defaults to READ COMMITTED; test is stable in the current environment.
+- `afterEach` cleanup in integration tests is non-atomic (three sequential deletes, no wrapping transaction). Consistent with existing project integration test patterns.
