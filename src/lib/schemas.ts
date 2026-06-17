@@ -13,3 +13,13 @@ export const loginSchema = z.object({
 })
 
 export type LoginInput = z.infer<typeof loginSchema>
+
+export const sendMoneySchema = z.object({
+  recipientId: z.number().int().positive(),
+  // Upper bound matches Postgres `integer` (int4) max so a transfer can never
+  // overflow the recipient's balance_cents column — rejected as 400, not a 500.
+  amountCents: z.number().int().positive().max(2_147_483_647),
+  note: z.string().max(500).optional(),
+})
+
+export type SendMoneyInput = z.infer<typeof sendMoneySchema>
