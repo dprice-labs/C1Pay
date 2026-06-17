@@ -70,3 +70,11 @@
 - `note` field in `transactions` table has no length constraint. No story requirement for max length; address if note becomes a user-facing field with display constraints.
 - Concurrent sends test asserts exactly 1 success / 1 failure — flaky under SERIALIZABLE isolation. PostgreSQL defaults to READ COMMITTED; test is stable in the current environment.
 - `afterEach` cleanup in integration tests is non-atomic (three sequential deletes, no wrapping transaction). Consistent with existing project integration test patterns.
+
+## Deferred from: code review of story-3.2 (2026-06-17)
+
+- E2E (`tests/e2e/send-money.spec.ts`) asserts the optimistic client balance and never verifies server-side money movement (sender debit + recipient credit); `Date.now()` username suffix can collide across parallel Playwright workers. Test hardening.
+- `src/app/api/users/search/route.ts:25` — search log line interpolates raw `q`; newlines/control chars can forge log entries. Low-severity logging hardening.
+- `src/app/(protected)/send/page.tsx:216` — `parseDollarsToCents` rejects leading-dot input like `.50` (regex requires a leading digit). Minor UX.
+- `src/lib/schemas.ts:41` — `sendMoneySchema.note` is not trimmed server-side; whitespace-only notes are storable via direct API calls. Low severity.
+- `src/app/(protected)/send/page.tsx:295` — server `VALIDATION_ERROR` surfaces in the generic banner rather than inline on the field (AC #8 intent); largely unreachable because the client pre-validates the amount. Minor.

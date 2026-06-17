@@ -1,6 +1,7 @@
 'use client'
 
 import { ArrowDownLeft, ArrowUpRight, Inbox } from "lucide-react"
+import Link from "next/link"
 import { AmountDisplay } from "@/components/ui/AmountDisplay"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,7 +26,12 @@ export default function HomePage() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Button size="lg" className="h-12 justify-start text-base">
+          <Button
+            size="lg"
+            className="h-12 justify-start text-base"
+            render={<Link href="/send" />}
+            nativeButton={false}
+          >
             <ArrowUpRight data-icon="inline-start" />
             Send
           </Button>

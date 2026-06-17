@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { eq } from 'drizzle-orm'
+import { eq, ilike, and, ne } from 'drizzle-orm'
 import { db } from '@/db/index'
 import { users } from '@/db/schema/users'
 import { AppError } from '@/lib/errors'
@@ -20,6 +20,20 @@ export async function getUserById(id: number): Promise<User> {
     throw new AppError('User not found', 'USER_NOT_FOUND', 404)
   }
   return user
+}
+
+export async function searchUsers(
+  term: string,
+  excludeUserId: number,
+): Promise<Array<{ id: number; username: string }>> {
+  // Escape LIKE/ILIKE metacharacters so user-typed `%`, `_`, or `\` are matched
+  // literally rather than acting as wildcards (which would enumerate all users).
+  const escaped = term.replace(/[\\%_]/g, '\\$&')
+  return db
+    .select({ id: users.id, username: users.username })
+    .from(users)
+    .where(and(ilike(users.username, `${escaped}%`), ne(users.id, excludeUserId)))
+    .limit(10)
 }
 
 export async function createUser(username: string, password: string): Promise<User> {
