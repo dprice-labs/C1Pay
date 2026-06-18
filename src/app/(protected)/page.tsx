@@ -2,14 +2,12 @@
 
 import { ArrowDownLeft, ArrowUpRight, Inbox } from "lucide-react"
 import Link from "next/link"
-import { AmountDisplay } from "@/components/ui/AmountDisplay"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useBalanceStore } from "@/store/balance"
 import { useRequestStore } from "@/store/requests"
+import { LiveBalance } from "./LiveBalance"
 
 export default function HomePage() {
-  const balanceCents = useBalanceStore((state) => state.balanceCents)
   const pendingCount = useRequestStore((state) => state.pendingCount)
 
   return (
@@ -21,7 +19,7 @@ export default function HomePage() {
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-muted-foreground">Current balance</p>
           <h1 id="balance-heading" className="text-5xl font-semibold tracking-normal">
-            <AmountDisplay cents={balanceCents} />
+            <LiveBalance />
           </h1>
         </div>
 

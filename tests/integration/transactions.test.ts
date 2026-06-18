@@ -5,6 +5,7 @@ import { transactions } from '@/db/schema/transactions'
 import { eq, or } from 'drizzle-orm'
 import { createUser } from '@/lib/users'
 import { sendMoney } from '@/lib/transactions'
+import { register, deregister } from '@/lib/sse-emitter'
 
 const SENDER_USERNAME = '__tx_test_sender__'
 const RECIPIENT_USERNAME = '__tx_test_recipient__'
@@ -78,6 +79,37 @@ describe('sendMoney integration', () => {
       .from(transactions)
       .where(or(eq(transactions.senderId, sender.id), eq(transactions.recipientId, recipient.id)))
     expect(txRows).toHaveLength(0)
+  })
+
+  it('emits BALANCE_UPDATED with the recipient new balance after commit', async () => {
+    const sender = await createUser(SENDER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+
+    // Register a real writer for the recipient so emit() delivers to a live stream.
+    const stream = new TransformStream<Uint8Array, Uint8Array>()
+    const writer = stream.writable.getWriter()
+    const reader = stream.readable.getReader()
+    register(recipient.id, writer)
+
+    try {
+      // Start reading BEFORE the emit fires. A TransformStream begins with backpressure
+      // on, so emit()'s awaited write only resolves once the readable side is being
+      // pulled — exactly as the live SSE response is consumed in production. Reading
+      // sequentially after the write would deadlock.
+      const framePromise = reader.read()
+
+      // The emit happens only after COMMIT (AC #2); receiving a frame proves it fired.
+      await sendMoney(sender.id, recipient.id, 25000)
+
+      const { value } = await framePromise
+      const frame = new TextDecoder().decode(value)
+
+      expect(frame).toContain('event: BALANCE_UPDATED')
+      expect(frame).toContain('"balance":125000') // 100000 + 25000
+    } finally {
+      deregister(recipient.id, writer)
+      await reader.cancel().catch(() => {})
+    }
   })
 
   it('serialises concurrent sends — balance never goes negative', async () => {
