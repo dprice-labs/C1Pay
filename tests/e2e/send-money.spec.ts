@@ -33,7 +33,7 @@ test('send money flow — search, amount, confirm, balance updates', async ({ pa
   expect(balanceText).toContain('$1,000.00')
 
   // Navigate to send flow
-  await page.getByRole('link', { name: /send/i }).click()
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(page).toHaveURL('/send')
   await expect(page.getByText('Step 1 of 3')).toBeVisible()
 
@@ -73,7 +73,7 @@ test('send money — insufficient balance shows explicit error', async ({ page }
   await registerUser(page, senderName)
   await loginUser(page, senderName)
 
-  await page.getByRole('link', { name: /send/i }).click()
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(page).toHaveURL('/send')
 
   await page.getByLabel('Search for a recipient by username').fill(recipientName)
@@ -91,10 +91,13 @@ test('send money — insufficient balance shows explicit error', async ({ page }
   await expect(page.getByText('Step 3 of 3')).toBeVisible()
   await page.getByRole('button', { name: 'Confirm & Send' }).click()
 
-  // Should show explicit insufficient balance error
-  await expect(page.getByRole('alert')).toContainText('Insufficient balance')
-  await expect(page.getByRole('alert')).toContainText('$1,000.00')
-  await expect(page.getByRole('alert')).toContainText('$9,999.00')
+  // Should show explicit insufficient balance error. Scope to the form's error alert —
+  // Next.js renders an always-present empty #__next-route-announcer__ with role="alert",
+  // so a bare getByRole('alert') is ambiguous in strict mode.
+  const errorAlert = page.getByRole('alert').filter({ hasText: 'Insufficient balance' })
+  await expect(errorAlert).toContainText('Insufficient balance')
+  await expect(errorAlert).toContainText('$1,000.00')
+  await expect(errorAlert).toContainText('$9,999.00')
 
   // Should remain on /send
   await expect(page).toHaveURL('/send')
