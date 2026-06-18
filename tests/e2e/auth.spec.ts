@@ -16,7 +16,7 @@ test('register → login → access protected page → logout → redirect to lo
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page).toHaveURL('/')
 
-  await expect(page.getByRole('heading', { name: /signed in/i })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
 
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page).toHaveURL('/login')
