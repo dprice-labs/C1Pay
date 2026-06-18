@@ -9,6 +9,8 @@ const SSE_HEADERS = {
   'X-Accel-Buffering': 'no',
 }
 
+const encoder = new TextEncoder()
+
 export async function GET(request: Request) {
   let userId: number
   try {
@@ -23,6 +25,14 @@ export async function GET(request: Request) {
 
   register(userId, writer)
   request.signal.addEventListener('abort', () => deregister(userId, writer))
+
+  // Flush an initial SSE comment so the runtime sends the response headers immediately.
+  // The readable stream is otherwise empty until the first emit(), and headers aren't sent
+  // until the first body byte — which would delay EventSource's `open` event (and block any
+  // client awaiting the response) until the first real event. A comment line is ignored by
+  // EventSource but opens the stream. Fire-and-forget: the default TransformStream is
+  // backpressured, so awaiting here could hang until the reader pulls.
+  writer.write(encoder.encode(': connected\n\n')).catch(() => {})
 
   return new Response(readable, { headers: SSE_HEADERS })
 }
