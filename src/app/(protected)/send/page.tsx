@@ -58,7 +58,13 @@ export default function SendPage() {
   function handleAdvanceToStep3() {
     const cents = parseDollarsToCents(dollarInput)
     if (cents === null) {
-      setAmountError('Enter a valid dollar amount (e.g. 25 or 25.50)')
+      const trimmed = dollarInput.trim()
+      const asNum = parseFloat(trimmed)
+      if (/^\d+(\.\d{1,2})?$/.test(trimmed) && isFinite(asNum) && Math.round(asNum * 100) > MAX_AMOUNT_CENTS) {
+        setAmountError(`Maximum transfer amount is $${(MAX_AMOUNT_CENTS / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}`)
+      } else {
+        setAmountError('Enter a valid dollar amount (e.g. 25 or 25.50)')
+      }
       return
     }
     setAmountCents(cents)
@@ -72,7 +78,7 @@ export default function SendPage() {
   }
 
   async function handleConfirm() {
-    if (!recipient || !amountCents || submitting) return
+    if (!recipient || amountCents === null || submitting) return
     setSubmitting(true)
     setSubmitError(null)
 

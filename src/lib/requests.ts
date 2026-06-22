@@ -19,10 +19,21 @@ export async function createRequest(
     throw new AppError('Amount must be positive', 'INVALID_AMOUNT', 400)
   }
 
-  const [inserted] = await db
-    .insert(paymentRequests)
-    .values({ requesterId, recipientId, amountCents, note: note ?? null })
-    .returning()
+  let inserted: PaymentRequest | undefined
+  try {
+    ;[inserted] = await db
+      .insert(paymentRequests)
+      .values({ requesterId, recipientId, amountCents, note: note ?? null })
+      .returning()
+  } catch (err) {
+    const pgCode =
+      (err as { code?: string }).code ??
+      ((err as { cause?: { code?: string } }).cause?.code)
+    if (pgCode === '23503') {
+      throw new AppError('Recipient not found', 'RECIPIENT_NOT_FOUND', 404)
+    }
+    throw err
+  }
 
   if (!inserted) throw new AppError('Request insert failed', 'INTERNAL_ERROR', 500)
 

@@ -12,7 +12,12 @@ export default async function ProtectedLayout({ children }: { children: React.Re
     <Providers initialBalance={user.balanceCents} initialPendingCount={initialPendingCount}>
       <header className="flex items-center justify-between gap-4 border-b p-4">
         <span className="font-semibold">C1Pay</span>
-        <LogoutButton />
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground" aria-label="Signed in as">
+            {user.username}
+          </span>
+          <LogoutButton />
+        </div>
       </header>
       <main className="flex flex-1 flex-col gap-4 p-4">{children}</main>
     </Providers>
