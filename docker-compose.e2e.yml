@@ -1,0 +1,74 @@
+# Isolated end-to-end test stack.
+#
+# Runs Playwright (with its browsers), the Next.js app, and a throwaway Postgres
+# entirely in containers. This lets e2e tests run on hosts where Playwright's
+# browsers won't launch natively (e.g. Ubuntu 26.04) WITHOUT touching your local
+# dev setup — your host Postgres instance, your host `node_modules`, and your host
+# `.next` cache are never read or written.
+#
+# Usage:
+#   npm run test:e2e:docker          # run the full e2e suite in containers
+#   npm run test:e2e:docker:clean    # drop the cached deps volume (after changing dependencies)
+#
+# Nothing here changes how `npm run dev`, `npm run test:e2e`, or `my-postgres`
+# behave natively — colleagues on other platforms keep running tests as before.
+
+# Dedicated Compose project name so `down --remove-orphans` here can never touch the
+# local dev database stack defined in docker-compose.yml.
+name: c1pay-e2e
+
+services:
+  e2e-db:
+    image: postgres:18-alpine # matches the host Postgres instance for parity
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: c1pay
+    # No host port mapping -> cannot collide with a host Postgres instance on :5432.
+    # tmpfs -> the database lives in RAM and vanishes with the container (fully ephemeral).
+    # Postgres 18+ uses a version-specific subdir, so mount at /var/lib/postgresql.
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d c1pay']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  e2e:
+    # Pinned to the resolved @playwright/test version so browser builds always match.
+    # Bump this tag together with the @playwright/test dependency.
+    image: mcr.microsoft.com/playwright:v1.60.0-noble
+    depends_on:
+      e2e-db:
+        condition: service_healthy
+    working_dir: /app
+    environment:
+      # Next.js does NOT override variables already present in the environment, so these
+      # take precedence over the bind-mounted .env.local and point the app + Drizzle at
+      # the throwaway e2e-db instead of your host Postgres.
+      DATABASE_URL: postgres://postgres:postgres@e2e-db:5432/c1pay
+      JWT_SECRET: e2e-jwt-secret-not-for-production
+      # CI mode: Playwright starts its own fresh dev server, enables retries, and forbids
+      # stray test.only(). Browsers are baked into the image, so no download happens.
+      CI: 'true'
+    volumes:
+      - .:/app # live source + tests (edit on host, no image rebuild)
+      - e2e_node_modules:/app/node_modules # container-only deps, built for noble — not your Ubuntu binaries
+      - /app/.next # container-only Next.js build cache — never touches your dev cache
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        if [ ! -x node_modules/.bin/playwright ]; then
+          echo "Installing dependencies into the e2e volume (first run only)…"
+          npm ci
+        fi
+        npm run db:migrate
+        npm run test:e2e
+
+volumes:
+  # Persists installed deps between runs so only the first run pays for `npm ci`.
+  # Removed by `npm run test:e2e:docker:clean` when dependencies change.
+  e2e_node_modules:
