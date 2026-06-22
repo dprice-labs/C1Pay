@@ -33,7 +33,10 @@ export function LiveBalance({ className }: { className?: string }) {
       aria-atomic="true"
       className={cn(
         'inline-block transition-colors duration-500 motion-reduce:transition-none',
-        highlight && 'motion-safe:animate-pulse text-primary',
+        // One-shot highlight: the existing transition-colors fades `text-primary` in for the
+        // 1s window and back out. (animate-pulse is an infinite loop and would render only an
+        // arbitrary truncated slice over that window.)
+        highlight && 'text-primary',
         className,
       )}
     >

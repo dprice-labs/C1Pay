@@ -43,7 +43,7 @@ test('recipient balance updates live when money is sent', async ({ browser }) =>
     // dropped, flaking this test on a slow worker. /api/sse returns its response headers only
     // AFTER register() runs, so awaiting that response proves B is registered. Set the waiter
     // up BEFORE the login navigation that opens the stream so it can't be missed.
-    const bSseRegistered = pageB.waitForResponse((r) => r.url().endsWith('/api/sse'), {
+    const bSseRegistered = pageB.waitForResponse((r) => new URL(r.url()).pathname === '/api/sse', {
       timeout: 15_000,
     })
     await login(pageB, recipient)
