@@ -103,3 +103,10 @@
 - **`resolvedAt` / status transitions not yet settable:** `PAID`, `DECLINED`, `CANCELLED` enum values exist but no service sets them. Explicitly deferred to Stories 4.3 / 4.4.
 - **No e2e test for request flow:** inbox page not yet available until Story 4.2; golden-path e2e test deferred to after Story 4.2 ships.
 - **No route-level test for `400 VALIDATION_ERROR` body (AC8):** route correctly returns 400 + VALIDATION_ERROR code, but no automated test exercises the HTTP layer. Route-level tests are not in this project's current test pyramid (unit + service integration only). Address in an API-testing pass or Epic 6.
+
+## Deferred from: code review of 3-4-transaction-history (2026-06-22)
+
+- **`note` has no length cap or row truncation** (`src/app/(protected)/history/TransactionRow.tsx`): the counterparty-supplied `note` renders verbatim (React-escaped, so not XSS) with no `max-length` upstream and no truncation/`title` in the row, so a very long note can break the dense layout. Note-length constraint was already deferred from the 3.1/3.2 reviews; add a `line-clamp`/`truncate` + `title` when notes become a hardened user-facing surface.
+- **`amountCents` typed as `number`** (`src/lib/transactions.ts` `TransactionHistoryItem`): values past `Number.MAX_SAFE_INTEGER` (~$90T) lose precision. Already deferred from the 3.1 review (INT4 max / `bigint` migration). Unreachable at training-app scale.
+- **`TransactionRow` assumes `createdAt` is a `Date`** (`src/app/(protected)/history/TransactionRow.tsx`): it calls `createdAt.toISOString()` directly. The page is a Server Component that passes a real `Date`, so this is correct today — but a future client consumer of `GET /api/transactions` (which JSON-serialises the Date to a string) would crash the row. Coerce defensively (`new Date(createdAt)`) when/if a client consumer is added.
+- **No `LIMIT`/pagination on `getTransactionHistory`** (`src/lib/transactions.ts`): the query returns the user's full history unbounded — slow query + large payload for high-volume users. Pagination was explicitly out of scope for Story 3.4; add keyset/`LIMIT` pagination when history volume warrants it.
