@@ -36,12 +36,19 @@ export async function searchUsers(
     .limit(10)
 }
 
-export async function createUser(username: string, password: string): Promise<User> {
+export async function createUser(
+  username: string,
+  password: string,
+  balanceCents = 100000,
+): Promise<User> {
+  if (!Number.isInteger(balanceCents) || balanceCents < 0) {
+    throw new AppError('Balance must be a non-negative integer', 'INVALID_AMOUNT', 400)
+  }
   const passwordHash = await bcrypt.hash(password, 12)
   try {
     const rows = await db
       .insert(users)
-      .values({ username, passwordHash, balanceCents: 100000 })
+      .values({ username, passwordHash, balanceCents })
       .returning()
     const user = rows[0]
     if (!user) {

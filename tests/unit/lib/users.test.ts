@@ -48,10 +48,35 @@ describe('createUser', () => {
     expect(inserted.passwordHash).not.toBe('mypassword')
   })
 
-  it('sets balanceCents to 100000', async () => {
+  it('sets balanceCents to 100000 by default', async () => {
     await createUser('alice', 'pass')
     const inserted = mockValues.mock.calls[0][0]
     expect(inserted.balanceCents).toBe(100000)
+  })
+
+  it('uses the provided balanceCents when given', async () => {
+    await createUser('alice', 'pass', 50000)
+    const inserted = mockValues.mock.calls[0][0]
+    expect(inserted.balanceCents).toBe(50000)
+  })
+
+  it('throws AppError INVALID_AMOUNT for a negative balanceCents', async () => {
+    await expect(createUser('alice', 'pass', -500)).rejects.toMatchObject({
+      code: 'INVALID_AMOUNT',
+      status: 400,
+    })
+  })
+
+  it('throws AppError INVALID_AMOUNT for a non-integer balanceCents', async () => {
+    await expect(createUser('alice', 'pass', 100.5)).rejects.toMatchObject({
+      code: 'INVALID_AMOUNT',
+      status: 400,
+    })
+  })
+
+  it('does not hash the password when balanceCents is invalid', async () => {
+    await createUser('alice', 'pass', -500).catch(() => {})
+    expect(mockBcryptHash).not.toHaveBeenCalled()
   })
 
   it('throws AppError USERNAME_TAKEN on duplicate username', async () => {
