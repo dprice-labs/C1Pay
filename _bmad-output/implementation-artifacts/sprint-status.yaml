@@ -65,7 +65,7 @@ development_status:
   epic-3: in-progress
   3-1-transactions-schema-and-atomic-send-service: done
   3-2-send-money-flow-search-amount-confirm: done
-  3-3-real-time-recipient-balance-update: review
+  3-3-real-time-recipient-balance-update: done
   3-4-transaction-history: backlog
   epic-3-retrospective: optional
 

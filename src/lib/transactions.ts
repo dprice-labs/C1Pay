@@ -74,10 +74,14 @@ export async function sendMoney(
   // recipient's connection is actively pulling. Awaiting it here would couple the sender's
   // already-committed transfer to the recipient's liveness: a stalled recipient tab would
   // hang the sender's POST. The money has moved; the sender must not wait on the recipient.
-  // emit() bounds and reaps its own stalled writes internally, so this floating promise is
-  // safe and cannot throw out of sendMoney. Recipient-only by design (AC #1) — the sender's
-  // debit is the optimistic client write (Story 3.2).
-  void emit(recipientId, { type: 'BALANCE_UPDATED', data: { balance: recipientBalanceCents } })
+  // emit() bounds and reaps its own stalled writes internally; the trailing .catch() guards
+  // the narrow window before emit()'s own try block (JSON.stringify / the initial write()), so
+  // this floating promise can never surface as an unhandled rejection out of sendMoney.
+  // Recipient-only by design (AC #1) — the sender's debit is the optimistic client write (Story 3.2).
+  void emit(recipientId, {
+    type: 'BALANCE_UPDATED',
+    data: { balance: recipientBalanceCents },
+  }).catch(() => {})
 
   return transaction
 }

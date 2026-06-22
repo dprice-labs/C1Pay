@@ -4,7 +4,7 @@ baseline_commit: e1840d7
 
 # Story 3.3: Real-Time Recipient Balance Update
 
-Status: review
+Status: done
 
 ## Story
 
@@ -32,7 +32,7 @@ so that the transfer is immediately visible without any action on my part.
   - [x] In `src/lib/transactions.ts`, add `import { emit } from '@/lib/sse-emitter'`
   - [x] Inside the `db.transaction` callback, capture the recipient's new balance in a variable — reuse the **exact** value already computed for the credit update: `recipientRow.balance_cents + amountCents` (do NOT re-query)
   - [x] Change the transaction callback to return both the inserted transaction and the recipient's new balance (e.g. `return { transaction: inserted, recipientBalanceCents }`)
-  - [x] After `await db.transaction(...)` resolves (i.e. after COMMIT), call `await emit(recipientId, { type: 'BALANCE_UPDATED', data: { balance: recipientBalanceCents } })`
+  - [x] After `await db.transaction(...)` resolves (i.e. after COMMIT), call `void emit(recipientId, { type: 'BALANCE_UPDATED', data: { balance: recipientBalanceCents } }).catch(() => {})` — **fire-and-forget, not awaited** (see Dev Notes): the money has already moved, so the sender's POST must not block on the recipient's SSE liveness; `emit()` self-bounds and reaps its own stalled writes. _(Code-review decision 2026-06-22: `void` confirmed over the spec's original `await`.)_
   - [x] Return the `Transaction` from `sendMoney` exactly as before — signature stays `Promise<Transaction>`
   - [x] Do NOT emit to the sender (see Dev Notes — sender update is the optimistic client write from Story 3.2)
 
@@ -58,6 +58,27 @@ so that the transfer is immediately visible without any action on my part.
   - [x] Both land on home (SSE opens). A completes the send funnel to B for a known amount
   - [x] Assert A's balance reflects the debit (e.g. `$975.00`) after returning home
   - [x] Assert B's balance updates **live without a reload** to the credited value (e.g. `$1,025.00`) — rely on Playwright's auto-retrying `expect(...).toHaveText()`; never call `page.reload()`
+
+### Review Findings
+
+_Adversarial code review (Blind Hunter + Edge Case Hunter + Acceptance Auditor), 2026-06-22. Baseline `e1840d7..HEAD`. No Critical/High blockers on the money-movement path; all 6 ACs functionally met. 2 decision-needed, 5 patch, 7 deferred, 5 dismissed._
+
+- [x] [Review][Patch] (resolved from Decision) Keep `void emit` — accepted; correct the spec/Dev Notes reference code and the Task 1 `[x] await emit` checkbox to reflect the shipped fire-and-forget `void emit(...)` and its documented rationale [transactions.ts:80 / spec Dev Notes + Task 1]
+- [x] [Review][Patch] (resolved from Decision) Add resync-on-reconnect — on `EventSource` `open`, re-fetch the authoritative balance and `setBalance()` so a `BALANCE_UPDATED` missed during a reaper-abort/reconnect gap self-heals (closes the AC #3 gap; reaper can stay) [src/hooks/use-sse.ts]
+
+- [x] [Review][Patch] `void emit(...)` missing `.catch()` — lines 42–46 run before the internal `try` (line 49); a synchronous throw surfaces as an unhandled rejection [src/lib/sse-emitter.ts:42-46 / src/lib/transactions.ts:80]
+- [x] [Review][Patch] e2e SSE matcher `.endsWith('/api/sse')` breaks if a query string is ever added (e.g. reconnection `?lastEventId=`); use a pathname/`includes` match [tests/e2e/realtime.spec.ts:46]
+- [x] [Review][Patch] `animate-pulse` is an infinite-loop animation used for a one-shot 1s highlight → user sees a truncated slice; the span already has `transition-colors duration-500`, so a one-shot fade is the intended effect [src/app/(protected)/LiveBalance.tsx:36]
+- [x] [Review][Patch] `migrate.mjs` has no friendly failure handling — a migration error propagates raw with no `[migrate]` context log and no explicit `process.exit(1)` [src/db/migrate.mjs:34-39]
+- [x] [Review][Patch] Dev Agent Record File List is inaccurate — omits `sse-emitter.ts`, `api/sse/route.ts`, `migrate.mjs`, `package.json`, `vitest.config.ts` and others; record them and the rationale for the two spec-frozen-file changes [story doc — File List]
+
+- [x] [Review][Defer] Integer-overflow guard on `recipientBalanceCents` (> INT4 max) [src/lib/transactions.ts:45] — deferred, pre-existing (already in deferred-work from 3.1)
+- [x] [Review][Defer] Concurrent same-`userId` emits not serialized; the new `abort()` can also race a concurrent emit's `write()` (double-abort) [src/lib/sse-emitter.ts:43-59] — deferred, extends the 2.3 deferred item
+- [x] [Review][Defer] `useSSE` closes permanently after 3 consecutive errors (FR29 deviation), and the new reaper makes repeated aborts more likely to trip it [src/hooks/use-sse.ts:34] — deferred, pre-existing documented deviation
+- [x] [Review][Defer] Integration test does not independently verify commit-before-emit (no DB re-query) and relies on one `read()` == one frame; negative path covered at unit level [tests/integration/transactions.test.ts] — deferred, optional hardening
+- [x] [Review][Defer] e2e `waitForResponse` resolves on response headers (registration), not active stream pull — "deterministic" framing is slightly overstated; masked by auto-retry [tests/e2e/realtime.spec.ts] — deferred, not a defect
+- [x] [Review][Defer] `aria-live` span nested inside the `<h1>` balance heading may produce verbose/odd SR announcements; needs a manual screen-reader check [src/app/(protected)/LiveBalance.tsx:31-41] — deferred to Epic 6 a11y audit
+- [x] [Review][Defer] `migrate.mjs` has no migration lock; parallel CI runners against a shared DB could race [src/db/migrate.mjs] — deferred, architectural
 
 ## Dev Notes
 
@@ -148,10 +169,15 @@ export async function sendMoney(
   })
 
   // AC #1 + #2: emit only after the transaction COMMITS. If the transaction throws/
-  // rolls back, this line is never reached → nothing is emitted. emit() swallows its
-  // own write errors internally, so it cannot throw out of sendMoney or affect the
-  // (already-committed) transfer.
-  await emit(recipientId, { type: 'BALANCE_UPDATED', data: { balance: recipientBalanceCents } })
+  // rolls back, this line is never reached → nothing is emitted. Fire-and-forget (void,
+  // NOT awaited): the money has moved, so the sender's POST must not block on the
+  // recipient's SSE liveness (a backpressured/stalled recipient stream would otherwise
+  // hang the response). emit() self-bounds and reaps its own stalled writes; the trailing
+  // .catch() guards the brief window before emit()'s internal try.
+  void emit(recipientId, {
+    type: 'BALANCE_UPDATED',
+    data: { balance: recipientBalanceCents },
+  }).catch(() => {})
 
   return transaction
 }
@@ -443,6 +469,9 @@ claude-opus-4-8 (Claude Code, BMad dev-story workflow)
 **New:**
 - `src/app/(protected)/LiveBalance.tsx`
 - `tests/e2e/realtime.spec.ts`
+- `src/db/migrate.mjs` (programmatic migrator — drizzle-kit CLI no-ops silently on Node 26)
+- `src/app/api/balance/route.ts` (authoritative balance read; added in code-review for SSE resync-on-reconnect)
+- `docker-compose.yml`, `docker-compose.integration.yml`, `docker-compose.e2e.yml` (local dev DB + ephemeral test stacks)
 
 **Modified:**
 - `src/lib/transactions.ts`
@@ -450,6 +479,11 @@ claude-opus-4-8 (Claude Code, BMad dev-story workflow)
 - `tests/unit/lib/transactions.test.ts`
 - `tests/integration/transactions.test.ts`
 - `tests/e2e/send-money.spec.ts` (pre-existing selector/alert fixes discovered while making the shared send flow runnable)
+- `tests/e2e/auth.spec.ts` (pre-existing assertion fix)
+- `src/hooks/use-sse.ts` (code-review: resync authoritative balance on SSE reconnect `open`)
+- `src/lib/sse-emitter.ts` — _spec-frozen file; changed deliberately:_ added a 10s write-timeout reaper so a stalled recipient writer can't leave `emit()` pending forever
+- `src/app/api/sse/route.ts` — _spec-frozen file; changed deliberately:_ flush an initial `: connected` comment so response headers (and thus registration) are observable to the e2e
+- `package.json`, `vitest.config.ts`, `README.md` (test scripts / runner config / docs for the containerised + local test flows)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (status tracking)
 
 ## Change Log
@@ -457,3 +491,4 @@ claude-opus-4-8 (Claude Code, BMad dev-story workflow)
 | Date       | Change                                                                                  |
 |------------|-----------------------------------------------------------------------------------------|
 | 2026-06-18 | Implemented Story 3.3 — `emit(BALANCE_UPDATED)` after commit in `sendMoney`; animated `LiveBalance` with `aria-live` on home; unit + integration + two-client e2e tests. Fixed pre-existing `send-money.spec.ts` Send-button role and ambiguous-alert selectors. Status → review. |
+| 2026-06-22 | Adversarial code review (3 layers). Decisions: kept `void emit` (fire-and-forget) + added SSE resync-on-reconnect via new `GET /api/balance`. Patches: `void emit` `.catch()` guard, robust e2e SSE path matcher, one-shot highlight (dropped `animate-pulse`), `migrate.mjs` failure logging/exit, File List accuracy. 7 items deferred. All tests green (unit 10, integration 12, e2e 7). Status → done. |

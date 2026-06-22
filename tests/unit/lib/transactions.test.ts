@@ -9,7 +9,9 @@ vi.mock('@/db/index', () => ({
 
 // Story 3.3: sendMoney emits a BALANCE_UPDATED SSE event after commit. Mock the emitter
 // so the unit suite can assert the emit contract without a real writer registry.
-vi.mock('@/lib/sse-emitter', () => ({ emit: vi.fn() }))
+// emit() is async (returns Promise<void>); sendMoney chains .catch() on it, so the mock
+// must resolve a promise rather than the default undefined.
+vi.mock('@/lib/sse-emitter', () => ({ emit: vi.fn().mockResolvedValue(undefined) }))
 
 import { sendMoney } from '@/lib/transactions'
 import { db } from '@/db/index'

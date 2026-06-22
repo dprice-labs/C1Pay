@@ -34,6 +34,9 @@ const sql = postgres(url, { max: 1 })
 try {
   await migrate(drizzle(sql), { migrationsFolder })
   console.log('[migrate] Migrations applied.')
+} catch (err) {
+  console.error('[migrate] failed:', err)
+  process.exitCode = 1
 } finally {
   await sql.end()
 }
