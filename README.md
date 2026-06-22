@@ -18,9 +18,43 @@ A Venmo/Zelle-style sandbox web app built as a team knowledge-sharing reference 
 |---|---|
 | Frontend | Next.js |
 | ORM | Drizzle ORM |
-| Database | PostgreSQL |
+| Database | PostgreSQL 18 |
 | Auth | JWT |
 | Testing | Vitest |
+
+## Local development database
+
+The app expects PostgreSQL 18 on `localhost:5432` (see `.env.local`). A pinned,
+ready-to-use instance is defined in `docker-compose.yml`:
+
+```bash
+docker compose up -d      # start c1pay-postgres (Postgres 18)
+npm run db:migrate        # apply the schema
+docker compose down       # stop it (data is preserved)
+docker compose down -v    # stop and wipe all data
+```
+
+The container is named `c1pay-postgres` and persists data in the `c1pay-pgdata`
+volume. It binds host `:5432`, so stop any other Postgres on that port first.
+This is separate from the throwaway database used by the e2e stack
+(`docker-compose.e2e.yml`).
+
+## Testing
+
+| Suite | Command | Database |
+|---|---|---|
+| Unit | `npm run test:unit` | none (mocked) |
+| Integration | `npm run test:integration` | your dev DB (`.env.local`) |
+| Integration (ephemeral DB) | `npm run test:integration:docker` | throwaway, spun up & torn down |
+| End-to-end (native) | `npm run test:e2e` | your dev DB (`.env.local`) |
+| End-to-end (containers) | `npm run test:e2e:docker` | throwaway, spun up & torn down |
+
+Unit tests never touch a database. `test:integration` and `test:e2e` run against
+your **dev** database — convenient, but they mutate it. The `:docker` variants
+each spin up an isolated, throwaway Postgres, migrate it, run the suite, and tear
+it down, so they never touch your dev data and need no local DB setup.
+`test:integration:docker` runs vitest on the host against a containerised DB on
+`:5433`; `test:e2e:docker` runs Playwright itself in a container too (see below).
 
 ## Running e2e in containers
 
