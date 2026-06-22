@@ -1,18 +1,20 @@
 import { realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { createUser, findByUsername } from '@/lib/users'
+import { createUser, findExistingUsernames } from '@/lib/users'
 import { AppError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
-import { pgClient } from '@/db/index'
+import { closeDb } from '@/db/index'
 
 const log = createLogger('seed')
 
 // Number(x) || fallback would silently discard an explicit "0" (0 is falsy in
-// JS) — parse manually so an operator-set 0 is honored rather than ignored.
+// JS) — parse manually so an operator-set 0 is honored. Number.isFinite (not
+// just isNaN) also rejects "Infinity"/"-Infinity", which would otherwise pass
+// straight through and make the create loop below run forever.
 function parseEnvInt(value: string | undefined, fallback: number): number {
   if (value === undefined || value === '') return fallback
   const parsed = Number(value)
-  return Number.isNaN(parsed) ? fallback : parsed
+  return Number.isFinite(parsed) ? parsed : fallback
 }
 
 export const SEED_ACCOUNT_COUNT = parseEnvInt(process.env.SEED_ACCOUNT_COUNT, 10)
@@ -20,19 +22,41 @@ export const SEED_BALANCE_CENTS = parseEnvInt(process.env.SEED_BALANCE_CENTS, 10
 export const SEED_USERNAME_PREFIX = 'testuser'
 export const SEED_PASSWORD = 'password123'
 
+// Fail fast on bad config before any DB work — without this, an invalid
+// SEED_BALANCE_CENTS only surfaces on the first loop iteration (via
+// createUser's own guard), aborting the whole batch with an error that looks
+// specific to "testuser1" rather than to the shared config value every
+// iteration would have failed on identically.
+function assertValidConfig(): void {
+  if (!Number.isInteger(SEED_ACCOUNT_COUNT) || SEED_ACCOUNT_COUNT < 0) {
+    throw new AppError(
+      `SEED_ACCOUNT_COUNT must be a non-negative integer, got ${SEED_ACCOUNT_COUNT}`,
+      'INVALID_CONFIG',
+      400,
+    )
+  }
+  if (!Number.isInteger(SEED_BALANCE_CENTS) || SEED_BALANCE_CENTS < 0) {
+    throw new AppError(
+      `SEED_BALANCE_CENTS must be a non-negative integer, got ${SEED_BALANCE_CENTS}`,
+      'INVALID_CONFIG',
+      400,
+    )
+  }
+}
+
 export async function createTestAccounts(): Promise<void> {
+  assertValidConfig()
+
   let created = 0
   let skipped = 0
 
   try {
-    for (let i = 1; i <= SEED_ACCOUNT_COUNT; i++) {
-      const username = `${SEED_USERNAME_PREFIX}${i}`
+    const candidates = Array.from({ length: SEED_ACCOUNT_COUNT }, (_, i) => `${SEED_USERNAME_PREFIX}${i + 1}`)
+    // One batched lookup instead of SEED_ACCOUNT_COUNT sequential round-trips.
+    const existingUsernames = await findExistingUsernames(candidates)
 
-      // Cheap existence check first: createUser() always pays bcrypt's ~100-300ms
-      // hash cost before its own USERNAME_TAKEN guard fires, so on a re-run where
-      // every account already exists, skipping here avoids hashing N times for nothing.
-      const existing = await findByUsername(username)
-      if (existing) {
+    for (const username of candidates) {
+      if (existingUsernames.has(username)) {
         skipped++
         continue
       }
@@ -42,7 +66,7 @@ export async function createTestAccounts(): Promise<void> {
         created++
       } catch (error) {
         // Safety net for the rare race where the account was created between
-        // the existence check above and this insert.
+        // the batched lookup above and this insert.
         if (error instanceof AppError && error.code === 'USERNAME_TAKEN') {
           skipped++
           continue
@@ -90,9 +114,6 @@ if (isMainModule()) {
       process.exitCode = 1
     })
     .finally(async () => {
-      // Close the real connection directly — globalThis._pgClient is only
-      // cached outside production (see src/db/index.ts), so relying on it
-      // here would silently no-op and leave the connection open in production.
-      await pgClient.end()
+      await closeDb()
     })
 }

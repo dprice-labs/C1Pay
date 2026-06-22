@@ -60,16 +60,16 @@ describe('createUser', () => {
     expect(inserted.balanceCents).toBe(50000)
   })
 
-  it('throws AppError INVALID_AMOUNT for a negative balanceCents', async () => {
+  it('throws AppError INVALID_BALANCE for a negative balanceCents', async () => {
     await expect(createUser('alice', 'pass', -500)).rejects.toMatchObject({
-      code: 'INVALID_AMOUNT',
+      code: 'INVALID_BALANCE',
       status: 400,
     })
   })
 
-  it('throws AppError INVALID_AMOUNT for a non-integer balanceCents', async () => {
+  it('throws AppError INVALID_BALANCE for a non-integer balanceCents', async () => {
     await expect(createUser('alice', 'pass', 100.5)).rejects.toMatchObject({
-      code: 'INVALID_AMOUNT',
+      code: 'INVALID_BALANCE',
       status: 400,
     })
   })

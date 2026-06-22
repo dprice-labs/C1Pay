@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { eq, ilike, and, ne } from 'drizzle-orm'
+import { eq, ilike, and, ne, inArray } from 'drizzle-orm'
 import { db } from '@/db/index'
 import { users } from '@/db/schema/users'
 import { AppError } from '@/lib/errors'
@@ -11,6 +11,18 @@ const log = createLogger('users')
 export async function findByUsername(username: string): Promise<User | undefined> {
   const [user] = await db.select().from(users).where(eq(users.username, username))
   return user
+}
+
+// Batched existence check: one round-trip for N candidate usernames instead of
+// N sequential findByUsername() calls — used by scripts/seed.ts to skip
+// already-existing accounts without a per-account query.
+export async function findExistingUsernames(usernames: string[]): Promise<Set<string>> {
+  if (usernames.length === 0) return new Set()
+  const rows = await db
+    .select({ username: users.username })
+    .from(users)
+    .where(inArray(users.username, usernames))
+  return new Set(rows.map((r) => r.username))
 }
 
 export async function getUserById(id: number): Promise<User> {
@@ -42,7 +54,10 @@ export async function createUser(
   balanceCents = 100000,
 ): Promise<User> {
   if (!Number.isInteger(balanceCents) || balanceCents < 0) {
-    throw new AppError('Balance must be a non-negative integer', 'INVALID_AMOUNT', 400)
+    // Distinct from transactions.ts/requests.ts's INVALID_AMOUNT — that code means
+    // "transfer/request amount is invalid"; this means "starting balance is invalid",
+    // a different failure a client/script needs to branch on separately.
+    throw new AppError('Balance must be a non-negative integer', 'INVALID_BALANCE', 400)
   }
   const passwordHash = await bcrypt.hash(password, 12)
   try {
