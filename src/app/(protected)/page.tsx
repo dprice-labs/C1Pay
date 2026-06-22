@@ -33,7 +33,13 @@ export default function HomePage() {
             <ArrowUpRight data-icon="inline-start" />
             Send
           </Button>
-          <Button variant="outline" size="lg" className="h-12 justify-start text-base">
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-12 justify-start text-base"
+            render={<Link href="/request" />}
+            nativeButton={false}
+          >
             <ArrowDownLeft data-icon="inline-start" />
             Request
           </Button>
