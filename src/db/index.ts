@@ -25,4 +25,14 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const db = drizzle(client, { schema })
+
+// For standalone scripts (e.g. scripts/seed.ts) to close the real connection
+// on exit — globalThis._pgClient is only cached outside production, so a
+// script relying on that global directly would silently no-op and leave the
+// connection open. A dedicated function (rather than exporting the raw
+// client) keeps this module the only place that knows how the connection is
+// actually structured and torn down.
+export async function closeDb(): Promise<void> {
+  await client.end()
+}
 logger.info('db', 'Drizzle client initialised')
