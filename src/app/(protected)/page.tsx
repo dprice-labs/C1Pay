@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowDownLeft, ArrowUpRight, Inbox } from "lucide-react"
+import { ArrowDownLeft, ArrowUpRight, Inbox, ListOrdered } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,13 @@ export default function HomePage() {
             <ArrowUpRight data-icon="inline-start" />
             Send
           </Button>
-          <Button variant="outline" size="lg" className="h-12 justify-start text-base">
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-12 justify-start text-base"
+            render={<Link href="/request" />}
+            nativeButton={false}
+          >
             <ArrowDownLeft data-icon="inline-start" />
             Request
           </Button>
@@ -62,6 +68,14 @@ export default function HomePage() {
           </Badge>
         ) : null}
       </section>
+
+      <Link
+        href="/history"
+        className="inline-flex items-center gap-2 self-start rounded-md text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        <ListOrdered aria-hidden="true" className="size-4" />
+        View transaction history
+      </Link>
     </div>
   )
 }

@@ -1,0 +1,30 @@
+# Ephemeral PostgreSQL for the integration test suite (tests/integration).
+#
+# Those tests hit a real database (via @/db). This stack gives them their own
+# throwaway Postgres 18 so they never touch your dev DB (docker-compose.yml).
+#
+# Unlike the e2e stack, vitest itself runs on the HOST — it works fine on Node 26
+# (only Playwright browsers needed containerising), so this file is just the database.
+#
+# Driven by `npm run test:integration:docker` (up --wait -> migrate -> vitest -> down).
+# Host port 5433 avoids colliding with the dev DB on 5432.
+
+name: c1pay-integration
+
+services:
+  integration-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: c1pay
+    ports:
+      - '5433:5432'
+    # tmpfs -> in-RAM, vanishes with the container. Postgres 18 mounts at /var/lib/postgresql.
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d c1pay']
+      interval: 2s
+      timeout: 3s
+      retries: 15

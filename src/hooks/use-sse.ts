@@ -6,6 +6,7 @@ import { useRequestStore } from '@/store/requests'
 
 export function useSSE(): void {
   useEffect(() => {
+    let cancelled = false
     const source = new EventSource('/api/sse')
 
     source.addEventListener('BALANCE_UPDATED', (e: MessageEvent) => {
@@ -32,8 +33,25 @@ export function useSSE(): void {
     // forever. Resets on successful open (transient errors don't accumulate).
     let errorStreak = 0
     source.onerror = () => { if (++errorStreak >= 3) source.close() }
-    source.addEventListener('open', () => { errorStreak = 0 })
 
-    return () => source.close()
+    // On every (re)connect, reconcile against the authoritative balance. The in-memory SSE
+    // emitter has no replay, so a BALANCE_UPDATED pushed while this stream was momentarily
+    // disconnected would otherwise be lost and leave the balance stale until a full reload.
+    source.addEventListener('open', () => {
+      errorStreak = 0
+      fetch('/api/balance')
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error('balance fetch failed'))))
+        .then(({ balanceCents }: { balanceCents: number }) => {
+          if (!cancelled) useBalanceStore.getState().setBalance(balanceCents)
+        })
+        .catch(() => {
+          // transient — the next reconnect or a BALANCE_UPDATED event will reconcile
+        })
+    })
+
+    return () => {
+      cancelled = true
+      source.close()
+    }
   }, [])
 }

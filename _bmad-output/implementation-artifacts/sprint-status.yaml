@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-18  # story 3.3 in review
+last_updated: 2026-06-22  # story 3.4 done (epic-3 complete); story 4.1 done
 project: C1Pay
 
 
@@ -62,16 +62,16 @@ development_status:
   epic-2-retrospective: optional
 
   # ── Epic 3: Send Money & Transaction History ──────────────────────────────────
-  epic-3: in-progress
+  epic-3: done
   3-1-transactions-schema-and-atomic-send-service: done
   3-2-send-money-flow-search-amount-confirm: done
-  3-3-real-time-recipient-balance-update: review
-  3-4-transaction-history: backlog
+  3-3-real-time-recipient-balance-update: done
+  3-4-transaction-history: done
   epic-3-retrospective: optional
 
   # ── Epic 4: Request Flow & State Machine ──────────────────────────────────────
-  epic-4: backlog
-  4-1-requests-schema-and-create-request: backlog
+  epic-4: in-progress
+  4-1-requests-schema-and-create-request: done
   4-2-inbox-and-pending-request-display: backlog
   4-3-pay-and-decline-a-request: backlog
   4-4-cancel-an-outgoing-request: backlog

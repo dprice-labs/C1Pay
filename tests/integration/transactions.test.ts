@@ -4,11 +4,13 @@ import { users } from '@/db/schema/users'
 import { transactions } from '@/db/schema/transactions'
 import { eq, or } from 'drizzle-orm'
 import { createUser } from '@/lib/users'
-import { sendMoney } from '@/lib/transactions'
+import { sendMoney, getTransactionHistory } from '@/lib/transactions'
 import { register, deregister } from '@/lib/sse-emitter'
 
 const SENDER_USERNAME = '__tx_test_sender__'
 const RECIPIENT_USERNAME = '__tx_test_recipient__'
+// Third fixture for the getTransactionHistory test (viewer is recipient of this user's send).
+const THIRD_USERNAME = '__tx_test_third__'
 
 afterAll(async () => {
   await globalThis._pgClient?.end()
@@ -19,7 +21,13 @@ afterEach(async () => {
   const testUsers = await db
     .select({ id: users.id })
     .from(users)
-    .where(or(eq(users.username, SENDER_USERNAME), eq(users.username, RECIPIENT_USERNAME)))
+    .where(
+      or(
+        eq(users.username, SENDER_USERNAME),
+        eq(users.username, RECIPIENT_USERNAME),
+        eq(users.username, THIRD_USERNAME),
+      ),
+    )
 
   for (const u of testUsers) {
     await db
@@ -29,7 +37,13 @@ afterEach(async () => {
 
   await db
     .delete(users)
-    .where(or(eq(users.username, SENDER_USERNAME), eq(users.username, RECIPIENT_USERNAME)))
+    .where(
+      or(
+        eq(users.username, SENDER_USERNAME),
+        eq(users.username, RECIPIENT_USERNAME),
+        eq(users.username, THIRD_USERNAME),
+      ),
+    )
 })
 
 describe('sendMoney integration', () => {
@@ -131,5 +145,44 @@ describe('sendMoney integration', () => {
     const [senderRow] = await db.select().from(users).where(eq(users.id, sender.id))
     expect(senderRow!.balanceCents).toBeGreaterThanOrEqual(0)
     expect(senderRow!.balanceCents).toBe(40000) // 100000 - 60000
+  })
+})
+
+describe('getTransactionHistory integration', () => {
+  it('returns both sent and received transactions newest-first with resolved counterparties', async () => {
+    // viewer = SENDER_USERNAME, A = RECIPIENT_USERNAME, B = THIRD_USERNAME
+    const viewer = await createUser(SENDER_USERNAME, 'pass')
+    const a = await createUser(RECIPIENT_USERNAME, 'pass')
+    const b = await createUser(THIRD_USERNAME, 'pass')
+
+    // Oldest: viewer SENDS to A. Newest: B SENDS to viewer (viewer is recipient).
+    // Distinct amounts make each row unambiguously identifiable.
+    await sendMoney(viewer.id, a.id, 10000, 'rent')
+    // Small delay so created_at differs and descending ordering is assertable.
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await sendMoney(b.id, viewer.id, 20000)
+
+    const history = await getTransactionHistory(viewer.id)
+
+    expect(history).toHaveLength(2)
+
+    // Descending by createdAt — the B→viewer send is newest, so it comes first.
+    expect(history[0]!.createdAt.getTime()).toBeGreaterThanOrEqual(history[1]!.createdAt.getTime())
+
+    const [received, sent] = history
+
+    expect(received).toMatchObject({
+      direction: 'received',
+      counterpartyUsername: THIRD_USERNAME,
+      amountCents: 20000,
+      note: null,
+    })
+
+    expect(sent).toMatchObject({
+      direction: 'sent',
+      counterpartyUsername: RECIPIENT_USERNAME,
+      amountCents: 10000,
+      note: 'rent',
+    })
   })
 })

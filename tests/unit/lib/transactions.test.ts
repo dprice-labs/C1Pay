@@ -9,9 +9,11 @@ vi.mock('@/db/index', () => ({
 
 // Story 3.3: sendMoney emits a BALANCE_UPDATED SSE event after commit. Mock the emitter
 // so the unit suite can assert the emit contract without a real writer registry.
-vi.mock('@/lib/sse-emitter', () => ({ emit: vi.fn() }))
+// emit() is async (returns Promise<void>); sendMoney chains .catch() on it, so the mock
+// must resolve a promise rather than the default undefined.
+vi.mock('@/lib/sse-emitter', () => ({ emit: vi.fn().mockResolvedValue(undefined) }))
 
-import { sendMoney } from '@/lib/transactions'
+import { sendMoney, toHistoryItem } from '@/lib/transactions'
 import { db } from '@/db/index'
 import { emit } from '@/lib/sse-emitter'
 
@@ -130,5 +132,50 @@ describe('sendMoney SSE emit contract', () => {
       type: 'BALANCE_UPDATED',
       data: { balance: 75000 }, // recipient 50000 + amount 25000
     })
+  })
+})
+
+describe('toHistoryItem mapping', () => {
+  const createdAt = new Date('2026-06-22T12:00:00.000Z')
+  const baseRow = {
+    id: 7,
+    senderId: 1,
+    recipientId: 2,
+    amountCents: 25000,
+    note: 'for lunch',
+    createdAt,
+    senderUsername: 'alice',
+    recipientUsername: 'bob',
+  }
+
+  it('derives direction "sent" and the recipient as counterparty when the viewer is the sender', () => {
+    const item = toHistoryItem(baseRow, 1) // viewer === senderId
+
+    expect(item).toEqual({
+      id: 7,
+      amountCents: 25000,
+      note: 'for lunch',
+      createdAt,
+      direction: 'sent',
+      counterpartyUsername: 'bob',
+    })
+  })
+
+  it('derives direction "received" and the sender as counterparty when the viewer is the recipient', () => {
+    const item = toHistoryItem(baseRow, 2) // viewer === recipientId
+
+    expect(item).toEqual({
+      id: 7,
+      amountCents: 25000,
+      note: 'for lunch',
+      createdAt,
+      direction: 'received',
+      counterpartyUsername: 'alice',
+    })
+  })
+
+  it('preserves a null note', () => {
+    const item = toHistoryItem({ ...baseRow, note: null }, 1)
+    expect(item.note).toBeNull()
   })
 })
