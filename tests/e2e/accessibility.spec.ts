@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Page, type Locator } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 const PASSWORD = 'password123'
@@ -38,19 +38,25 @@ function formatViolations(
     .join('\n\n')
 }
 
-async function auditPage(page: Page, route: string) {
+// `ready` is a locator unique to the route under test. Asserting it is visible
+// before scanning guards against a false green: without it, an error boundary or
+// an auth redirect would be audited instead of the real page and still report
+// zero violations. Awaiting visibility also lets client hydration settle so axe
+// scans the final DOM rather than a partially-rendered one.
+async function auditPage(page: Page, route: string, ready: Locator) {
+  await expect(ready).toBeVisible()
   const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze()
   expect(results.violations, formatViolations(results.violations, route)).toEqual([])
 }
 
 test('login page has zero violations', async ({ page }) => {
   await page.goto('/login')
-  await auditPage(page, '/login')
+  await auditPage(page, '/login', page.getByRole('button', { name: 'Sign in' }))
 })
 
 test('register page has zero violations', async ({ page }) => {
   await page.goto('/register')
-  await auditPage(page, '/register')
+  await auditPage(page, '/register', page.getByRole('button', { name: 'Create account' }))
 })
 
 test('authenticated pages have zero violations', async ({ page }) => {
@@ -58,14 +64,14 @@ test('authenticated pages have zero violations', async ({ page }) => {
   await register(page, username)
   await login(page, username)
 
-  await auditPage(page, '/')
+  await auditPage(page, '/', page.locator('#balance-heading'))
 
   await page.goto('/send')
-  await auditPage(page, '/send')
+  await auditPage(page, '/send', page.getByRole('heading', { name: 'Send money', level: 1 }))
 
   await page.goto('/request')
-  await auditPage(page, '/request')
+  await auditPage(page, '/request', page.getByRole('heading', { name: 'Request money', level: 1 }))
 
   await page.goto('/history')
-  await auditPage(page, '/history')
+  await auditPage(page, '/history', page.getByRole('heading', { name: 'Transaction history', level: 1 }))
 })

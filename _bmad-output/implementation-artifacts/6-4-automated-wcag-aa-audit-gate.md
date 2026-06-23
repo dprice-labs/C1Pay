@@ -4,7 +4,7 @@ baseline_commit: c0c01ba
 
 # Story 6.4: Automated WCAG AA Audit Gate
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -50,6 +50,18 @@ so that WCAG AA compliance is continuously verified and regressions are caught.
   - [x] If any route reports violations, fix the underlying page/component (not the test) — see Dev Notes for what's already in place vs. likely gaps
   - [x] Re-run until all accessibility tests pass with zero violations on every route
   - [x] Run the full existing e2e suite (not just the new file) to confirm no regression from any fix made in this story
+
+### Review Findings
+
+_Adversarial code review 2026-06-23 (Blind Hunter + Edge Case Hunter + Acceptance Auditor). Acceptance Auditor: clean pass — all 4 ACs and every Dev-Notes scope constraint satisfied._
+
+- [x] [Review][Patch] Audits don't assert the intended page actually rendered before scanning — an error boundary or auth redirect can be audited as zero-violation (false green). The Debug Log already records a Next.js 500 error page being audited on `/history`. Assert a route-specific landmark/heading (which also waits out hydration) before each `auditPage`. [tests/e2e/accessibility.spec.ts:42-71] — FIXED 2026-06-23: `auditPage` now takes a route-unique `ready` Locator and asserts `toBeVisible()` before scanning.
+- [x] [Review][Defer] Gate audits only the initial/empty DOM — the populated listbox + `aria-activedescendant` active state (the very behavior this story changed) is never exercised [tests/e2e/accessibility.spec.ts:56-71] — deferred, spec explicitly scoped component states out of 6.4 (AC #1 "page/route" wording); strong follow-up for 6.1
+- [x] [Review][Defer] Empty-state only — funded `/send` and populated `/history` transaction-row markup never audited [tests/e2e/accessibility.spec.ts:56-71] — deferred, data-dependent; needs a seeded account, follow-up
+- [x] [Review][Defer] Combobox ARIA incomplete — search input has `aria-controls`/`aria-activedescendant`/`aria-autocomplete` but no `aria-expanded`/`role="combobox"` [src/app/(protected)/send/UserSearchInput.tsx:109-121] — deferred, Story 6.1 full-ARIA scope; axe-clean and not regressed by this diff
+- [x] [Review][Defer] Component hardcodes global ids (`user-search`, `user-search-listbox`, `user-option-N`) — latent duplicate-id collision if two instances ever co-mount on one route [src/app/(protected)/send/UserSearchInput.tsx:95,110,144] — deferred, pre-existing; non-manifesting (used only one-per-route on /send and /request)
+- [x] [Review][Defer] `reuseExistingServer` + unmigrated local DB → `register` hits a 500 → all authenticated audits time out (this actually occurred per the Debug Log) [playwright.config.ts:19-22] — deferred, test-infra/env; candidate for a globalSetup migration guard / CI hardening
+- [x] [Review][Defer] No teardown — `e2e_a11y_*` accounts accumulate in the test DB on every run [tests/e2e/accessibility.spec.ts:56] — deferred, suite-wide convention (matches all existing e2e specs); address in a suite-level cleanup pass
 
 ## Dev Notes
 
