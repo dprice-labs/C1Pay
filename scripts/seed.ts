@@ -1,9 +1,13 @@
 import { realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { or, inArray, like } from 'drizzle-orm'
+import { db, closeDb } from '@/db/index'
+import { users } from '@/db/schema/users'
+import { transactions } from '@/db/schema/transactions'
+import { paymentRequests } from '@/db/schema/requests'
 import { createUser, findExistingUsernames } from '@/lib/users'
 import { AppError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
-import { closeDb } from '@/db/index'
 
 const log = createLogger('seed')
 
@@ -83,14 +87,80 @@ export async function createTestAccounts(): Promise<void> {
   }
 }
 
+export async function resetTestAccounts(): Promise<void> {
+  assertValidConfig()
+
+  let accountsReset = 0
+  let transactionsCleared = 0
+  let requestsCleared = 0
+
+  try {
+    await db.transaction(async (tx) => {
+      // Discover accounts by prefix LIKE, then filter client-side to the exact
+      // pattern (prefix + digits only). Using LIKE for the SELECT is safe —
+      // it's read-only, and the regex step drops any false matches like
+      // 'testuser_admin'. This also means reset finds every account that
+      // createTestAccounts ever made, regardless of what SEED_ACCOUNT_COUNT
+      // is set to right now — avoiding a silent partial-reset if the two
+      // commands are invoked with different counts.
+      const prefixRows = await tx
+        .select({ id: users.id, username: users.username })
+        .from(users)
+        .where(like(users.username, `${SEED_USERNAME_PREFIX}%`))
+
+      const testPattern = new RegExp(`^${SEED_USERNAME_PREFIX}\\d+$`)
+      const testUserIds = prefixRows
+        .filter((r) => testPattern.test(r.username))
+        .map((r) => r.id)
+
+      if (testUserIds.length > 0) {
+        const txDeleted = await tx
+          .delete(transactions)
+          .where(or(inArray(transactions.senderId, testUserIds), inArray(transactions.recipientId, testUserIds)))
+          .returning({ id: transactions.id })
+        transactionsCleared = txDeleted.length
+
+        const reqDeleted = await tx
+          .delete(paymentRequests)
+          .where(
+            or(
+              inArray(paymentRequests.requesterId, testUserIds),
+              inArray(paymentRequests.recipientId, testUserIds),
+            ),
+          )
+          .returning({ id: paymentRequests.id })
+        requestsCleared = reqDeleted.length
+
+        const updated = await tx
+          .update(users)
+          .set({ balanceCents: SEED_BALANCE_CENTS })
+          .where(inArray(users.id, testUserIds))
+          .returning({ id: users.id })
+        accountsReset = updated.length
+      }
+    })
+
+    log.info(
+      `reset: ${accountsReset} account(s) reset to ${SEED_BALANCE_CENTS} cents, ${transactionsCleared} transaction(s) cleared, ${requestsCleared} request(s) cleared`,
+    )
+  } catch (err) {
+    log.error(
+      `reset aborted (transaction rolled back): ${err instanceof Error ? err.message : String(err)}`,
+    )
+    throw err
+  }
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2]
-  if (command !== 'create') {
-    log.error(`Unknown or missing command "${command}". Usage: npm run seed -- create`)
+  if (command === 'create') {
+    await createTestAccounts()
+  } else if (command === 'reset') {
+    await resetTestAccounts()
+  } else {
+    log.error(`Unknown or missing command "${command}". Usage: npm run seed -- <create|reset>`)
     process.exitCode = 1
-    return
   }
-  await createTestAccounts()
 }
 
 // Only run when executed directly (`tsx scripts/seed.ts`), not when imported by tests.
