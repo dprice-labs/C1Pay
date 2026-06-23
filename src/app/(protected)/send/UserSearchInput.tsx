@@ -131,22 +131,28 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
         {statusMessage}
       </div>
 
-      {results.length > 0 && (
-        <ul id={listboxId} role="listbox" aria-label="Matching users" className="flex flex-col gap-1">
-          {results.map((user, index) => (
-            <li key={user.id} role="option" aria-selected={index === activeIndex} id={`user-option-${index}`}>
-              <button
-                type="button"
-                className="w-full rounded-md border bg-card px-4 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => onSelect(user)}
-                tabIndex={0}
-              >
-                {user.username}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* Always rendered (even with no results) so `aria-controls` on the input
+          above always resolves to a real element — axe's aria-valid-attr-value
+          rule flags a dangling reference otherwise. */}
+      <ul
+        id={listboxId}
+        role="listbox"
+        aria-label="Matching users"
+        className={results.length > 0 ? 'flex flex-col gap-1' : 'hidden'}
+      >
+        {results.map((user, index) => (
+          <li key={user.id} role="option" aria-selected={index === activeIndex} id={`user-option-${index}`}>
+            <button
+              type="button"
+              className="w-full rounded-md border bg-card px-4 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => onSelect(user)}
+              tabIndex={0}
+            >
+              {user.username}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-22  # story 3.4 done (epic-3 complete); story 4.1 done; story 5.1 done (PR #21)
+last_updated: 2026-06-23  # story 6.4 done (code review: 1 patch applied — false-green guard; 6 deferred)
 project: C1Pay
 
 
@@ -85,11 +85,11 @@ development_status:
   epic-5-retrospective: optional
 
   # ── Epic 6: Accessibility & Responsive Design ─────────────────────────────────
-  epic-6: backlog
+  epic-6: in-progress
   6-1-semantic-structure-aria-and-contrast-baseline: backlog
   6-2-keyboard-first-navigation-across-core-flows: backlog
   6-3-responsive-layout-mobile-tablet-desktop: backlog
-  6-4-automated-wcag-aa-audit-gate: backlog
+  6-4-automated-wcag-aa-audit-gate: done
   epic-6-retrospective: optional
 
   # ── Epic 7 (Phase 2): Learning Layer ─────────────────────────────────────────
