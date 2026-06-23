@@ -53,4 +53,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright MCP
 .playwright-mcp/
+
+# generated agent/skill tooling (BMad sync — local mirrors)
+.agents/
+.opencode/commands/
+.claude/skills/
