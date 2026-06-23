@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-23  # story 6.4 done (code review: 1 patch applied — false-green guard; 6 deferred)
+last_updated: 2026-06-23  # story 5.2 created (ready-for-dev)
 project: C1Pay
 
 
@@ -81,7 +81,7 @@ development_status:
   # ── Epic 5: Batch Administration ─────────────────────────────────────────────
   epic-5: in-progress
   5-1-batch-create-test-accounts: done
-  5-2-reset-test-accounts: backlog
+  5-2-reset-test-accounts: review
   epic-5-retrospective: optional
 
   # ── Epic 6: Accessibility & Responsive Design ─────────────────────────────────
