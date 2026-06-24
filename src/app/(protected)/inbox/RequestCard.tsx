@@ -15,7 +15,7 @@ export function RequestCard({ item }: { item: InboxRequestItem }) {
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="font-medium">{item.requesterUsername}</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="truncate text-xs text-muted-foreground">
               Payment request{item.note ? ` · ${item.note}` : ''}
             </span>
           </div>
@@ -30,9 +30,7 @@ export function RequestCard({ item }: { item: InboxRequestItem }) {
 
       <div className="flex items-center gap-2">
         {/* Text label carries meaning — colour is supplementary only (UX-DR3) */}
-        <Badge variant="default" aria-label="Status: PENDING">
-          PENDING
-        </Badge>
+        <Badge variant="secondary">PENDING</Badge>
 
         {/* 4-state lifecycle teaching artifact (UX-DR12) */}
         <div

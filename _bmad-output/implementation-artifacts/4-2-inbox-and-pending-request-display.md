@@ -4,7 +4,7 @@ baseline_commit: 3967a76f492b4eb4a7944d8dc489b05223d3cfc6
 
 # Story 4.2: Inbox & Pending Request Display
 
-Status: review
+Status: done
 
 ## Story
 
@@ -114,3 +114,18 @@ Files created/modified by this story:
 #### Change Log
 
 - 2026-06-24: Implemented story 4.2 — GET /api/requests handler, /inbox Server Component page, RequestCard with PENDING badge and FSM lifecycle indicator, home page Inbox→Link, getInboxRequests integration tests.
+
+### Review Findings
+
+- [x] [Review][Decision] Seed `initialPendingCount` from DB on layout load — fixed: layout now calls `getInboxRequests(userId)` in parallel with `getUserById` and seeds the real count [src/app/(protected)/layout.tsx]
+- [x] [Review][Patch] `GET /api/requests` serialises `createdAt` as string but `InboxRequestItem` types it as `Date` — added inline comment warning [src/app/api/requests/route.ts]
+- [x] [Review][Patch] `aria-label` on Badge duplicates visible text — removed redundant aria-label [src/app/(protected)/inbox/RequestCard.tsx]
+- [x] [Review][Patch] Error log in GET handler drops the stack trace — now logs full `err` object [src/app/api/requests/route.ts]
+- [x] [Review][Patch] Note field has no truncation — added `truncate` class [src/app/(protected)/inbox/RequestCard.tsx]
+- [x] [Review][Patch] Badge `variant="default"` uses primary colour, not subtle — changed to `variant="secondary"` [src/app/(protected)/inbox/RequestCard.tsx]
+- [x] [Review][Patch] Non-PENDING exclusion only tests `PAID` — expanded to `it.each` covering PAID, DECLINED, CANCELLED [tests/integration/requests.test.ts]
+- [x] [Review][Defer] `dateFmt` hardcoded to `en-US` [src/app/(protected)/inbox/RequestCard.tsx:6] — deferred, pre-existing pattern from TransactionRow
+- [x] [Review][Defer] SSE `REQUEST_RECEIVED` event never emitted from `createRequest` [src/lib/requests.ts] — deferred, story 4.5 scope
+- [x] [Review][Defer] No `error.tsx` boundary for `/inbox` route — deferred, consistent with history page pattern
+- [x] [Review][Defer] SSE reconnect stale `pendingCount` — deferred, pre-existing SSE behavior from story 2.3
+- [x] [Review][Defer] `RequestCard` hardcodes "PENDING" string rather than reading from item — deferred, by design (inbox only shows PENDING items)

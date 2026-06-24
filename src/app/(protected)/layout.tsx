@@ -1,12 +1,13 @@
 import { getAuthUser } from '@/lib/auth'
 import { getUserById } from '@/lib/users'
+import { getInboxRequests } from '@/lib/requests'
 import LogoutButton from './LogoutButton'
 import Providers from './Providers'
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await getAuthUser()
-  const user = await getUserById(userId)
-  const initialPendingCount = 0 // Story 4.2 wires the real query once payment_requests exists
+  const [user, inboxItems] = await Promise.all([getUserById(userId), getInboxRequests(userId)])
+  const initialPendingCount = inboxItems.length
 
   return (
     <Providers initialBalance={user.balanceCents} initialPendingCount={initialPendingCount}>

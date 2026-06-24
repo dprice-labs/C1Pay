@@ -138,14 +138,18 @@ describe('getInboxRequests integration', () => {
     expect(items).toHaveLength(0)
   })
 
-  it('excludes non-PENDING requests', async () => {
+  it.each([
+    ['PAID'],
+    ['DECLINED'],
+    ['CANCELLED'],
+  ] as const)('excludes %s requests', async (status) => {
     const requester = await createUser(REQUESTER_USERNAME, 'pass')
     const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
 
     const req = await createRequest(requester.id, recipient.id, 3000)
     await db
       .update(paymentRequests)
-      .set({ status: 'PAID' })
+      .set({ status })
       .where(eq(paymentRequests.id, req.id))
 
     const items = await getInboxRequests(recipient.id)

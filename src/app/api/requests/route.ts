@@ -17,10 +17,11 @@ export async function GET() {
 
   try {
     const items = await getInboxRequests(userId)
+    // Note: createdAt serialises to an ISO string over the wire — Date type is only valid server-side.
     return Response.json(items)
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err.message, err.code, err.status)
-    log.error(`unexpected error in GET /api/requests: ${err instanceof Error ? err.message : String(err)}`)
+    log.error('unexpected error in GET /api/requests', err)
     return errorResponse('Internal server error', 'INTERNAL_ERROR', 500)
   }
 }
