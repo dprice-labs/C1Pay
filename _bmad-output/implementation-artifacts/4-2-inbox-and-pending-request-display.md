@@ -1,6 +1,10 @@
+---
+baseline_commit: 3967a76f492b4eb4a7944d8dc489b05223d3cfc6
+---
+
 # Story 4.2: Inbox & Pending Request Display
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -20,26 +24,26 @@ So that I understand what is pending and can decide how to act on each.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define `InboxRequestItem` interface and implement `getInboxRequests` (AC: #1, #7)
-  - [ ] Define `InboxRequestItem` type mirroring `TransactionHistoryItem` pattern (Story 3.4)
-  - [ ] Implement single-query join: `payment_requests` INNER JOIN `users` on `requester_id`
-  - [ ] Filter: `recipientId = userId` AND `status = 'PENDING'`
-  - [ ] Order: newest first (`createdAt DESC`, tie-break on `id DESC`)
-  - [ ] Add integration test to `tests/integration/requests.test.ts`
-- [ ] Task 2: Add GET handler to `/api/requests` route (AC: #2)
-  - [ ] Authenticate via `getAuthUser()` with try/catch pattern
-  - [ ] Call `getInboxRequests(userId)` and return JSON
-  - [ ] Handle `AppError` and unexpected errors with `errorResponse`
-- [ ] Task 3: Create `/inbox` page as Server Component (AC: #3, #6)
-  - [ ] Create `src/app/(protected)/inbox/page.tsx` following HistoryPage pattern
-  - [ ] Call service directly (Server Component, no `'use client'`)
-  - [ ] Render empty state when no pending requests
-  - [ ] Make home page Inbox section a `<Link href="/inbox">` for navigation
-- [ ] Task 4: Create `RequestCard` component (AC: #3, #4, #5)
-  - [ ] Create `src/app/(protected)/inbox/RequestCard.tsx` as presentational Server Component
-  - [ ] Follow `TransactionRow` layout: icon box, username, note, amount, timestamp
-  - [ ] Render text status badge (`PENDING`) with supporting colour — never colour alone (UX-DR3)
-  - [ ] Include compact state lifecycle indicator showing `PENDING → PAID|DECLINED|CANCELLED` (UX-DR12)
+- [x] Task 1: Define `InboxRequestItem` interface and implement `getInboxRequests` (AC: #1, #7)
+  - [x] Define `InboxRequestItem` type mirroring `TransactionHistoryItem` pattern (Story 3.4)
+  - [x] Implement single-query join: `payment_requests` INNER JOIN `users` on `requester_id`
+  - [x] Filter: `recipientId = userId` AND `status = 'PENDING'`
+  - [x] Order: newest first (`createdAt DESC`, tie-break on `id DESC`)
+  - [x] Add integration test to `tests/integration/requests.test.ts`
+- [x] Task 2: Add GET handler to `/api/requests` route (AC: #2)
+  - [x] Authenticate via `getAuthUser()` with try/catch pattern
+  - [x] Call `getInboxRequests(userId)` and return JSON
+  - [x] Handle `AppError` and unexpected errors with `errorResponse`
+- [x] Task 3: Create `/inbox` page as Server Component (AC: #3, #6)
+  - [x] Create `src/app/(protected)/inbox/page.tsx` following HistoryPage pattern
+  - [x] Call service directly (Server Component, no `'use client'`)
+  - [x] Render empty state when no pending requests
+  - [x] Make home page Inbox section a `<Link href="/inbox">` for navigation
+- [x] Task 4: Create `RequestCard` component (AC: #3, #4, #5)
+  - [x] Create `src/app/(protected)/inbox/RequestCard.tsx` as presentational Server Component
+  - [x] Follow `TransactionRow` layout: icon box, username, note, amount, timestamp
+  - [x] Render text status badge (`PENDING`) with supporting colour — never colour alone (UX-DR3)
+  - [x] Include compact state lifecycle indicator showing `PENDING → PAID|DECLINED|CANCELLED` (UX-DR12)
 
 ## Dev Notes
 
@@ -81,25 +85,47 @@ So that I understand what is pending and can decide how to act on each.
 
 #### Agent Model Used
 
-qwen3.6:27b
+claude-sonnet-4-6
 
 #### Debug Log References
 
-N/A — planning phase
+N/A
 
 #### Completion Notes List
 
-- Story mirrors 3.4 (Transaction History) patterns exactly for consistency
-- State lifecycle indicator (UX-DR12) is a new UI element not present in TransactionRow — this is the key differentiator
-- The `getInboxRequests` query is simpler than `getTransactionHistory`: one join (requester only), single WHERE clause (recipientId + PENDING status)
-- Home page Inbox section currently shows Badge but is not clickable — converting to Link is a minimal change
+- `getInboxRequests` and `InboxRequestItem` were already implemented in `src/lib/requests.ts` from a prior partial attempt; verified correct and added integration tests.
+- 4 integration tests added for `getInboxRequests`: happy path (resolved username), excludes outgoing, excludes non-PENDING, empty array. All pass.
+- `GET /api/requests` added alongside existing `POST` — same auth-then-service try/catch pattern.
+- `/inbox` page is a Server Component mirroring `history/page.tsx` exactly.
+- `RequestCard` mirrors `TransactionRow` layout with two additions: `<Badge>PENDING</Badge>` (text label + colour per UX-DR3) and a compact FSM lifecycle indicator `PENDING → PAID | DECLINED | CANCELLED` (UX-DR12).
+- Home page Inbox section converted from `<section>` to `<Link href="/inbox">` preserving all existing content and aria attributes.
+- All 25 integration tests pass; 52 unit tests pass; 0 lint errors; 0 TS errors in src/.
 
 #### File List
 
 Files created/modified by this story:
-- `src/lib/requests.ts`
-- `src/app/api/requests/route.ts`
+- `src/lib/requests.ts` (already existed — no changes needed, `getInboxRequests` was already correct)
+- `src/app/api/requests/route.ts` (modified — added GET handler)
 - `src/app/(protected)/inbox/page.tsx` (new)
 - `src/app/(protected)/inbox/RequestCard.tsx` (new)
-- `src/app/(protected)/page.tsx`
-- `tests/integration/requests.test.ts`
+- `src/app/(protected)/page.tsx` (modified — Inbox section converted to Link)
+- `tests/integration/requests.test.ts` (modified — added getInboxRequests describe block with 4 tests)
+
+#### Change Log
+
+- 2026-06-24: Implemented story 4.2 — GET /api/requests handler, /inbox Server Component page, RequestCard with PENDING badge and FSM lifecycle indicator, home page Inbox→Link, getInboxRequests integration tests.
+
+### Review Findings
+
+- [x] [Review][Decision] Seed `initialPendingCount` from DB on layout load — fixed: layout now calls `getInboxRequests(userId)` in parallel with `getUserById` and seeds the real count [src/app/(protected)/layout.tsx]
+- [x] [Review][Patch] `GET /api/requests` serialises `createdAt` as string but `InboxRequestItem` types it as `Date` — added inline comment warning [src/app/api/requests/route.ts]
+- [x] [Review][Patch] `aria-label` on Badge duplicates visible text — removed redundant aria-label [src/app/(protected)/inbox/RequestCard.tsx]
+- [x] [Review][Patch] Error log in GET handler drops the stack trace — now logs full `err` object [src/app/api/requests/route.ts]
+- [x] [Review][Patch] Note field has no truncation — added `truncate` class [src/app/(protected)/inbox/RequestCard.tsx]
+- [x] [Review][Patch] Badge `variant="default"` uses primary colour, not subtle — changed to `variant="secondary"` [src/app/(protected)/inbox/RequestCard.tsx]
+- [x] [Review][Patch] Non-PENDING exclusion only tests `PAID` — expanded to `it.each` covering PAID, DECLINED, CANCELLED [tests/integration/requests.test.ts]
+- [x] [Review][Defer] `dateFmt` hardcoded to `en-US` [src/app/(protected)/inbox/RequestCard.tsx:6] — deferred, pre-existing pattern from TransactionRow
+- [x] [Review][Defer] SSE `REQUEST_RECEIVED` event never emitted from `createRequest` [src/lib/requests.ts] — deferred, story 4.5 scope
+- [x] [Review][Defer] No `error.tsx` boundary for `/inbox` route — deferred, consistent with history page pattern
+- [x] [Review][Defer] SSE reconnect stale `pendingCount` — deferred, pre-existing SSE behavior from story 2.3
+- [x] [Review][Defer] `RequestCard` hardcodes "PENDING" string rather than reading from item — deferred, by design (inbox only shows PENDING items)

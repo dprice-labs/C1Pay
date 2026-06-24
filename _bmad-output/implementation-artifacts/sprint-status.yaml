@@ -72,7 +72,7 @@ development_status:
   # ── Epic 4: Request Flow & State Machine ──────────────────────────────────────
   epic-4: in-progress
   4-1-requests-schema-and-create-request: done
-  4-2-inbox-and-pending-request-display: ready-for-dev
+  4-2-inbox-and-pending-request-display: done
   4-3-pay-and-decline-a-request: backlog
   4-4-cancel-an-outgoing-request: backlog
   4-5-real-time-inbox-and-resolution-updates: backlog
