@@ -4,7 +4,7 @@ import { users } from '@/db/schema/users'
 import { paymentRequests } from '@/db/schema/requests'
 import { eq, or } from 'drizzle-orm'
 import { createUser } from '@/lib/users'
-import { createRequest } from '@/lib/requests'
+import { createRequest, getInboxRequests } from '@/lib/requests'
 
 const REQUESTER_USERNAME = '__req_test_requester__'
 const RECIPIENT_USERNAME = '__req_test_recipient__'
@@ -105,5 +105,59 @@ describe('createRequest integration', () => {
       .where(eq(paymentRequests.requesterId, requester.id))
 
     expect(rows).toHaveLength(0)
+  })
+})
+
+describe('getInboxRequests integration', () => {
+  it('returns PENDING incoming requests with resolved requester username', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+
+    await createRequest(requester.id, recipient.id, 7500, 'lunch')
+
+    const items = await getInboxRequests(recipient.id)
+
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      requesterUsername: REQUESTER_USERNAME,
+      amountCents: 7500,
+      note: 'lunch',
+    })
+    expect(items[0]!.id).toBeTypeOf('number')
+    expect(items[0]!.createdAt).toBeInstanceOf(Date)
+  })
+
+  it('excludes outgoing requests (user is requester, not recipient)', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+
+    await createRequest(requester.id, recipient.id, 5000)
+
+    const items = await getInboxRequests(requester.id)
+
+    expect(items).toHaveLength(0)
+  })
+
+  it('excludes non-PENDING requests', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+
+    const req = await createRequest(requester.id, recipient.id, 3000)
+    await db
+      .update(paymentRequests)
+      .set({ status: 'PAID' })
+      .where(eq(paymentRequests.id, req.id))
+
+    const items = await getInboxRequests(recipient.id)
+
+    expect(items).toHaveLength(0)
+  })
+
+  it('returns empty array when no pending requests exist', async () => {
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+
+    const items = await getInboxRequests(recipient.id)
+
+    expect(items).toHaveLength(0)
   })
 })

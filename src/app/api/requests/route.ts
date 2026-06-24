@@ -1,10 +1,29 @@
 import { getAuthUser } from '@/lib/auth'
-import { createRequest } from '@/lib/requests'
+import { createRequest, getInboxRequests } from '@/lib/requests'
 import { createRequestSchema } from '@/lib/schemas'
 import { errorResponse, AppError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('requests-route')
+
+export async function GET() {
+  let userId: number
+  try {
+    ;({ userId } = await getAuthUser())
+  } catch (err) {
+    if (err instanceof AppError) return errorResponse(err.message, err.code, err.status)
+    return errorResponse('Unauthorized', 'UNAUTHORIZED', 401)
+  }
+
+  try {
+    const items = await getInboxRequests(userId)
+    return Response.json(items)
+  } catch (err) {
+    if (err instanceof AppError) return errorResponse(err.message, err.code, err.status)
+    log.error(`unexpected error in GET /api/requests: ${err instanceof Error ? err.message : String(err)}`)
+    return errorResponse('Internal server error', 'INTERNAL_ERROR', 500)
+  }
+}
 
 export async function POST(request: Request) {
   let body: unknown

@@ -46,9 +46,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section
+      <Link
+        href="/inbox"
         aria-labelledby="inbox-heading"
-        className="flex items-center justify-between gap-4 rounded-xl border bg-card p-4 text-card-foreground"
+        className="flex items-center justify-between gap-4 rounded-xl border bg-card p-4 text-card-foreground hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <div className="flex items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -67,7 +68,7 @@ export default function HomePage() {
             {pendingCount}
           </Badge>
         ) : null}
-      </section>
+      </Link>
 
       <Link
         href="/history"
