@@ -1,0 +1,4 @@
+# Team override for bmad-code-review.
+# Capture review session metrics in the story file.
+[workflow]
+on_complete = "If {spec_file} is set, update the Session Metrics section of the story file: set 'Completed' under Code Review to the current datetime ({date}), and set 'Duration' to the elapsed time since this review session started. Then write the file `{project-root}/.claude/story-session.json` with this exact JSON content (replacing STORY_FILE_PATH with the absolute path to the story file): {\"story_file\": \"STORY_FILE_PATH\", \"phase\": \"review\"}. This intent file is read by the Stop hook to automatically capture token usage — no user action needed."
