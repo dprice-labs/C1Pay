@@ -1,5 +1,13 @@
 # Deferred Work
 
+## Deferred from: code review of bug-22-auth-infra-errors-return-401 (2026-06-25)
+
+- **Error message interpolated verbatim in log without redaction** (`tests/unit/api/auth-error-handling.test.ts` and all route handlers): `err.message` is logged raw in all routes; if a third-party auth SDK embeds connection strings or tokens in error messages they would appear in logs. Pre-existing pattern throughout the codebase.
+- **No stack trace logged on unexpected auth errors** (all affected route handlers): `err.message` is used; `err.stack` would be more useful for infrastructure failures. Pre-existing pattern.
+- **`balance/route.ts` has no `log.error` on unexpected auth errors**: the route already returns 500 correctly (pre-dates this bug) but silently — no log line emitted. Minor observability gap; not introduced by this diff.
+- **`cookies()` is the only realistic non-AppError source in `getAuthUser()`**: JWT errors are caught and re-wrapped as `AppError` inside `getAuthUser`; only a framework-level `cookies()` failure escapes as a plain Error. Not actionable; informational for future maintainers.
+- **SSE route returns JSON on auth failure while client opened stream as `text/event-stream`**: `errorResponse()` returns `Content-Type: application/json`; browser `EventSource` fires `onerror` on any non-2xx which is correct, but the content-type mismatch may confuse proxies. Pre-existing design constraint.
+
 ## Deferred from: code review of story-1.1 (2026-06-01)
 
 - `globals.css` `body` hard-codes `Arial` while `layout.tsx` loads the Geist font and exposes `--font-geist-sans`; Geist is downloaded but never applied at the body level. Resolve when building the real UI (Epic 2 — Home Screen UI).

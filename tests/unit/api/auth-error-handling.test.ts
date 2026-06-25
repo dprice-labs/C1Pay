@@ -19,8 +19,10 @@ vi.mock('@/lib/transactions', () => ({
 }))
 vi.mock('@/lib/users', () => ({ searchUsers: vi.fn() }))
 vi.mock('@/lib/sse-emitter', () => ({ register: vi.fn(), deregister: vi.fn() }))
+
+const mockLogError = vi.fn()
 vi.mock('@/lib/logger', () => ({
-  createLogger: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() }),
+  createLogger: () => ({ info: vi.fn(), error: mockLogError, warn: vi.fn() }),
 }))
 vi.mock('@/db/index', () => ({ db: {} }))
 
@@ -48,13 +50,14 @@ async function parseJson(res: Response) {
 describe('GET /api/requests — auth error handling', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns 500 INTERNAL_ERROR when getAuthUser throws a non-AppError', async () => {
+  it('returns 500 INTERNAL_ERROR and logs the error when getAuthUser throws a non-AppError', async () => {
     mockAuthInfraError()
     const { GET } = await import('@/app/api/requests/route')
     const res = await GET()
     expect(res.status).toBe(500)
     const body = await parseJson(res)
     expect(body.code).toBe('INTERNAL_ERROR')
+    expect(mockLogError).toHaveBeenCalledWith(expect.stringContaining('unexpected error in getAuthUser'))
   })
 
   it('returns 401 UNAUTHORIZED when getAuthUser throws an AppError (regression guard)', async () => {
@@ -72,7 +75,7 @@ describe('GET /api/requests — auth error handling', () => {
 describe('POST /api/requests — auth error handling', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns 500 INTERNAL_ERROR when getAuthUser throws a non-AppError', async () => {
+  it('returns 500 INTERNAL_ERROR and logs the error when getAuthUser throws a non-AppError', async () => {
     mockAuthInfraError()
     const { POST } = await import('@/app/api/requests/route')
     const req = new Request('http://localhost/api/requests', {
@@ -84,6 +87,7 @@ describe('POST /api/requests — auth error handling', () => {
     expect(res.status).toBe(500)
     const body = await parseJson(res)
     expect(body.code).toBe('INTERNAL_ERROR')
+    expect(mockLogError).toHaveBeenCalledWith(expect.stringContaining('unexpected error in getAuthUser'))
   })
 
   it('returns 401 UNAUTHORIZED when getAuthUser throws an AppError (regression guard)', async () => {
@@ -106,7 +110,7 @@ describe('POST /api/requests — auth error handling', () => {
 describe('POST /api/transactions — auth error handling', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns 500 INTERNAL_ERROR when getAuthUser throws a non-AppError', async () => {
+  it('returns 500 INTERNAL_ERROR and logs the error when getAuthUser throws a non-AppError', async () => {
     mockAuthInfraError()
     const { POST } = await import('@/app/api/transactions/route')
     const req = new Request('http://localhost/api/transactions', {
@@ -118,6 +122,7 @@ describe('POST /api/transactions — auth error handling', () => {
     expect(res.status).toBe(500)
     const body = await parseJson(res)
     expect(body.code).toBe('INTERNAL_ERROR')
+    expect(mockLogError).toHaveBeenCalledWith(expect.stringContaining('unexpected error in getAuthUser'))
   })
 
   it('returns 401 UNAUTHORIZED when getAuthUser throws an AppError (regression guard)', async () => {
@@ -140,13 +145,14 @@ describe('POST /api/transactions — auth error handling', () => {
 describe('GET /api/transactions — auth error handling', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns 500 INTERNAL_ERROR when getAuthUser throws a non-AppError', async () => {
+  it('returns 500 INTERNAL_ERROR and logs the error when getAuthUser throws a non-AppError', async () => {
     mockAuthInfraError()
     const { GET } = await import('@/app/api/transactions/route')
     const res = await GET()
     expect(res.status).toBe(500)
     const body = await parseJson(res)
     expect(body.code).toBe('INTERNAL_ERROR')
+    expect(mockLogError).toHaveBeenCalledWith(expect.stringContaining('unexpected error in getAuthUser'))
   })
 
   it('returns 401 UNAUTHORIZED when getAuthUser throws an AppError (regression guard)', async () => {
@@ -164,7 +170,7 @@ describe('GET /api/transactions — auth error handling', () => {
 describe('GET /api/users/search — auth error handling', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns 500 INTERNAL_ERROR when getAuthUser throws a non-AppError', async () => {
+  it('returns 500 INTERNAL_ERROR and logs the error when getAuthUser throws a non-AppError', async () => {
     mockAuthInfraError()
     const { GET } = await import('@/app/api/users/search/route')
     const req = new Request('http://localhost/api/users/search?q=alice')
@@ -172,6 +178,7 @@ describe('GET /api/users/search — auth error handling', () => {
     expect(res.status).toBe(500)
     const body = await parseJson(res)
     expect(body.code).toBe('INTERNAL_ERROR')
+    expect(mockLogError).toHaveBeenCalledWith(expect.stringContaining('unexpected error in getAuthUser'))
   })
 
   it('returns 401 UNAUTHORIZED when getAuthUser throws an AppError (regression guard)', async () => {
@@ -190,7 +197,7 @@ describe('GET /api/users/search — auth error handling', () => {
 describe('PATCH /api/requests/[id] — auth error handling', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns 500 INTERNAL_ERROR when getAuthUser throws a non-AppError', async () => {
+  it('returns 500 INTERNAL_ERROR and logs the error when getAuthUser throws a non-AppError', async () => {
     mockAuthInfraError()
     const { PATCH } = await import('@/app/api/requests/[id]/route')
     const req = new Request('http://localhost/api/requests/1', {
@@ -202,6 +209,7 @@ describe('PATCH /api/requests/[id] — auth error handling', () => {
     expect(res.status).toBe(500)
     const body = await parseJson(res)
     expect(body.code).toBe('INTERNAL_ERROR')
+    expect(mockLogError).toHaveBeenCalledWith(expect.stringContaining('unexpected error in getAuthUser'))
   })
 
   it('returns 401 UNAUTHORIZED when getAuthUser throws an AppError (regression guard)', async () => {
@@ -224,7 +232,7 @@ describe('PATCH /api/requests/[id] — auth error handling', () => {
 describe('GET /api/sse — auth error handling', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns 500 INTERNAL_ERROR when getAuthUser throws a non-AppError', async () => {
+  it('returns 500 INTERNAL_ERROR and logs the error when getAuthUser throws a non-AppError', async () => {
     mockAuthInfraError()
     const { GET } = await import('@/app/api/sse/route')
     const req = new Request('http://localhost/api/sse')
@@ -232,6 +240,7 @@ describe('GET /api/sse — auth error handling', () => {
     expect(res.status).toBe(500)
     const body = await parseJson(res)
     expect(body.code).toBe('INTERNAL_ERROR')
+    expect(mockLogError).toHaveBeenCalledWith(expect.stringContaining('unexpected error in getAuthUser'))
   })
 
   it('returns 401 UNAUTHORIZED when getAuthUser throws an AppError (regression guard)', async () => {

@@ -4,7 +4,7 @@ baseline_commit: 9258804f90772de0646440c8933c3f14d09d174c
 
 # Bug 22: Auth Infrastructure Errors Silently Return 401 Instead of 500
 
-**Status:** review
+**Status:** done
 **GitHub Issue:** #22
 **Type:** Bug
 
@@ -106,8 +106,8 @@ Add/update unit tests in `tests/unit/` (or wherever route handler tests live) co
 ### Development
 - Started: 2026-06-25T00:00:00
 - Completed: 2026-06-25
-- Duration: —
-- Tokens (dev): —
+- Duration: 8 min
+- Tokens (dev): 99,837 (in: 65 / out: 99,772)
 
 ### Code Review
 - Completed: —
@@ -151,3 +151,20 @@ All 4 acceptance criteria satisfied:
 | 2026-06-25 | Fixed 6 getAuthUser() catch fallbacks to return 500 instead of 401 for infrastructure errors (GH #22) |
 | 2026-06-25 | Added createLogger to sse/route.ts (previously had no logger) |
 | 2026-06-25 | Added 14 unit tests covering 500/401 behaviour across all affected handlers |
+
+---
+
+## Senior Developer Review (AI)
+
+**Date:** 2026-06-25
+**Outcome:** Changes Requested
+**Layers:** Blind Hunter, Edge Case Hunter, Acceptance Auditor
+
+### Action Items
+
+- [x] [Review][Patch] AC3 has no test coverage — `log.error` call is never asserted; removing it would not fail any test [`tests/unit/api/auth-error-handling.test.ts`] — **FIXED:** shared `mockLogError` spy added; all 7 500-path tests now assert `log.error` was called
+- [x] [Review][Defer] Error message interpolated verbatim in log without redaction — pre-existing pattern in all route handlers
+- [x] [Review][Defer] No stack trace logged (only `err.message`) — pre-existing pattern
+- [x] [Review][Defer] `balance/route.ts` has no `log.error` on unexpected auth errors (already returns 500, just silently) — pre-existing, not introduced by this diff
+- [x] [Review][Defer] `cookies()` is the only realistic non-AppError source in `getAuthUser()` — informational context, not actionable
+- [x] [Review][Defer] SSE route returns JSON on auth failure while client expects `text/event-stream` — pre-existing design constraint

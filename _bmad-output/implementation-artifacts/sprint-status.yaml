@@ -94,7 +94,7 @@ development_status:
   epic-6-retrospective: optional
 
   # ── Bug Fixes ────────────────────────────────────────────────────────────────
-  bug-22-auth-infra-errors-return-401: review  # GH #22
+  bug-22-auth-infra-errors-return-401: done  # GH #22
 
   # ── Epic 7 (Phase 2): Learning Layer ─────────────────────────────────────────
   epic-7: backlog
