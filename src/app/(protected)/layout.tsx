@@ -22,7 +22,12 @@ export default async function ProtectedLayout({ children }: { children: React.Re
       <header className="flex items-center justify-between gap-4 border-b p-4">
         <Link href="/" className="font-semibold hover:text-foreground/80">C1Pay</Link>
         <NavLinks />
-        <LogoutButton />
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground" aria-label={`Signed in as ${user.username}`}>
+            @{user.username}
+          </span>
+          <LogoutButton />
+        </div>
       </header>
       <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col gap-4 p-4">{children}</main>
     </Providers>
