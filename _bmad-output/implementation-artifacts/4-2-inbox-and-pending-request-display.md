@@ -115,6 +115,19 @@ Files created/modified by this story:
 
 - 2026-06-24: Implemented story 4.2 — GET /api/requests handler, /inbox Server Component page, RequestCard with PENDING badge and FSM lifecycle indicator, home page Inbox→Link, getInboxRequests integration tests.
 
+## Session Metrics
+
+### Development
+- Started: 2026-06-24
+- Completed: 2026-06-24
+- Duration: ~1 session
+- Tokens (dev): 99,837 (in: 65 / out: 99,772)
+
+### Code Review
+- Completed: 2026-06-24
+- Duration: ~1 session
+- Tokens: —
+
 ### Review Findings
 
 - [x] [Review][Decision] Seed `initialPendingCount` from DB on layout load — fixed: layout now calls `getInboxRequests(userId)` in parallel with `getUserById` and seeds the real count [src/app/(protected)/layout.tsx]
