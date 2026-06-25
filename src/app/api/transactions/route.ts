@@ -24,7 +24,8 @@ export async function POST(request: Request) {
     ;({ userId } = await getAuthUser())
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err.message, err.code, err.status)
-    return errorResponse('Unauthorized', 'UNAUTHORIZED', 401)
+    log.error(`unexpected error in getAuthUser (POST /api/transactions): ${err instanceof Error ? err.message : String(err)}`)
+    return errorResponse('Internal server error', 'INTERNAL_ERROR', 500)
   }
 
   try {
@@ -57,7 +58,8 @@ export async function GET() {
     ;({ userId } = await getAuthUser())
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err.message, err.code, err.status)
-    return errorResponse('Unauthorized', 'UNAUTHORIZED', 401)
+    log.error(`unexpected error in getAuthUser (GET /api/transactions): ${err instanceof Error ? err.message : String(err)}`)
+    return errorResponse('Internal server error', 'INTERNAL_ERROR', 500)
   }
 
   try {

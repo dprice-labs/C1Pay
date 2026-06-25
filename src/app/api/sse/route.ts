@@ -1,6 +1,9 @@
 import { getAuthUser } from '@/lib/auth'
 import { AppError, errorResponse } from '@/lib/errors'
 import { register, deregister } from '@/lib/sse-emitter'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('sse-route')
 
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
@@ -17,7 +20,8 @@ export async function GET(request: Request) {
     ;({ userId } = await getAuthUser())
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err.message, err.code, err.status)
-    return errorResponse('Unauthorized', 'UNAUTHORIZED', 401)
+    log.error(`unexpected error in getAuthUser (GET /api/sse): ${err instanceof Error ? err.message : String(err)}`)
+    return errorResponse('Internal server error', 'INTERNAL_ERROR', 500)
   }
 
   const { readable, writable } = new TransformStream()
