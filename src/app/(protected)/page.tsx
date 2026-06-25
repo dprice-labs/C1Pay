@@ -46,6 +46,11 @@ export default function HomePage() {
         </div>
       </section>
 
+      <span aria-live="polite" aria-atomic="true" className="sr-only">
+        {pendingCount > 0
+          ? `${pendingCount} pending request${pendingCount !== 1 ? 's' : ''}`
+          : 'No pending requests'}
+      </span>
       <Link
         href="/inbox"
         aria-labelledby="inbox-heading"
@@ -64,7 +69,7 @@ export default function HomePage() {
         </div>
 
         {pendingCount > 0 ? (
-          <Badge aria-label={`${pendingCount} pending incoming requests`}>
+          <Badge aria-label={`${pendingCount} pending incoming requests`} aria-hidden="true">
             {pendingCount}
           </Badge>
         ) : null}

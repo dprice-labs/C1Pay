@@ -19,6 +19,7 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
+  const [isOpen, setIsOpen] = useState(true)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const controllerRef = useRef<AbortController | null>(null)
@@ -63,6 +64,7 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
   function handleChange(value: string) {
     setQuery(value)
     setActiveIndex(-1)
+    setIsOpen(true)
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
     const term = value.trim()
@@ -78,7 +80,13 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (results.length === 0) return
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setActiveIndex(-1)
+      setIsOpen(false)
+      return
+    }
+    if (results.length === 0 || !isOpen) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setActiveIndex((i) => Math.min(i + 1, results.length - 1))
@@ -94,6 +102,7 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
 
   const listboxId = 'user-search-listbox'
   const trimmedQuery = query.trim()
+  const isExpanded = trimmedQuery.length > 0 && results.length > 0 && isOpen
   const statusMessage = loading
     ? 'Searching…'
     : error
@@ -114,8 +123,11 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
           value={query}
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          role="combobox"
           aria-label="Search for a recipient by username"
           aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-expanded={isExpanded}
           aria-controls={listboxId}
           aria-activedescendant={activeIndex >= 0 ? `user-option-${activeIndex}` : undefined}
         />
@@ -138,18 +150,18 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
         id={listboxId}
         role="listbox"
         aria-label="Matching users"
-        className={results.length > 0 ? 'flex flex-col gap-1' : 'hidden'}
+        className={results.length > 0 && isOpen ? 'flex flex-col gap-1' : 'hidden'}
       >
         {results.map((user, index) => (
-          <li key={user.id} role="option" aria-selected={index === activeIndex} id={`user-option-${index}`}>
-            <button
-              type="button"
-              className="w-full rounded-md border bg-card px-4 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => onSelect(user)}
-              tabIndex={0}
-            >
-              {user.username}
-            </button>
+          <li
+            key={user.id}
+            role="option"
+            aria-selected={index === activeIndex}
+            id={`user-option-${index}`}
+            onClick={() => onSelect(user)}
+            className="w-full cursor-pointer rounded-md border bg-card px-4 py-2 text-sm hover:bg-accent"
+          >
+            {user.username}
           </li>
         ))}
       </ul>

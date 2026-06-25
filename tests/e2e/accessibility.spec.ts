@@ -66,6 +66,9 @@ test('authenticated pages have zero violations', async ({ page }) => {
 
   await auditPage(page, '/', page.locator('#balance-heading'))
 
+  await page.goto('/inbox')
+  await auditPage(page, '/inbox', page.getByRole('heading', { name: 'Inbox', level: 1 }))
+
   await page.goto('/send')
   await auditPage(page, '/send', page.getByRole('heading', { name: 'Send money', level: 1 }))
 
