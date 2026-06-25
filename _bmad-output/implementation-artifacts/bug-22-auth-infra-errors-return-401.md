@@ -110,7 +110,7 @@ Add/update unit tests in `tests/unit/` (or wherever route handler tests live) co
 - Tokens (dev): 99,837 (in: 65 / out: 99,772)
 
 ### Code Review
-- Completed: —
+- Completed: 2026-06-25
 - Duration: —
 - Tokens: —
 
