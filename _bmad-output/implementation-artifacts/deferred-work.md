@@ -130,9 +130,9 @@
 
 ## Deferred from: code review of 6-1-semantic-structure-aria-and-contrast-baseline (2026-06-24) — ALL RESOLVED in same session
 
-- **h1 loses `data-slot="card-title"`** (`src/app/(auth)/login/page.tsx:9`, `register/page.tsx:9`): the raw `<h1>` has no `data-slot` identifier; any future component-library CSS targeting `[data-slot="card-title"]` will miss these auth headings silently. Intentional per spec (change use-sites, not the component); reassess if `CardTitle` gains slot-dependent styles.
-- **C1Pay brand `<span>` has no link or navigation semantics** (`src/app/(protected)/layout.tsx:15`): convention is for a logo/brand mark to link home; bare `<span>` gives no affordance. Pre-existing; update when implementing a design system or branding pass.
-- **`<button>` inside `<li role="option">` invalid ARIA content model** (`src/app/(protected)/send/UserSearchInput.tsx`): ARIA 1.2 requires option children to be phrasing content only; nested interactive `<button>` creates redundant tab stop and invalid content model. Pre-existing; fix in Story 6.2 keyboard-navigation pass.
-- **`tabIndex={0}` on option `<button>` adds spurious tab stop** (`src/app/(protected)/send/UserSearchInput.tsx`): combobox spec requires focus to stay in the input; tab should not enter the listbox. Pre-existing; fix alongside the `<button>`-inside-option issue in Story 6.2.
-- **Escape key not handled in `handleKeyDown`** (`src/app/(protected)/send/UserSearchInput.tsx:80-93`): ARIA APG §3.8 requires Escape to collapse the popup and return focus to the input. Pre-existing; add in Story 6.2 keyboard-navigation pass.
-- **Duplicate `aria-label="Main"` landmark if any child page adds a competing nav** (`src/app/(protected)/layout.tsx:17`): currently no child page introduces a nav landmark; theoretical conflict. Audit all routes in Story 6.2 when adding keyboard-navigation landmarks.
+- ~~**h1 loses `data-slot="card-title"`**~~ — **RESOLVED (2026-06-24):** auth headings changed from `CardTitle` to raw `<h1>` at the use-site per spec; `CardTitle` component itself unchanged.
+- ~~**C1Pay brand `<span>` has no link or navigation semantics**~~ — **RESOLVED (2026-06-24):** brand mark converted to an `<a href="/">` home link in `src/app/(protected)/layout.tsx`.
+- ~~**`<button>` inside `<li role="option">` invalid ARIA content model**~~ — **RESOLVED (2026-06-24):** `UserSearchInput` options changed to plain `<li role="option">` with click handler — no nested `<button>`.
+- ~~**`tabIndex={0}` on option `<button>` adds spurious tab stop**~~ — **RESOLVED (2026-06-24):** removed with the `<button>` element above; tab focus now stays in the combobox input.
+- ~~**Escape key not handled in `handleKeyDown`**~~ — **RESOLVED (2026-06-24):** Escape now sets `isOpen(false)` and clears `activeIndex` in `UserSearchInput.handleKeyDown`.
+- ~~**Duplicate `aria-label="Main"` landmark if any child page adds a competing nav**~~ — **RESOLVED (2026-06-24):** audited all protected routes in Story 6.1; no competing nav landmark exists.
