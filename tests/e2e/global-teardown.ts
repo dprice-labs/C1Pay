@@ -18,7 +18,25 @@ export default async function globalTeardown() {
 
   const sql = postgres(url, { max: 1 })
   try {
-    await sql`DELETE FROM users WHERE username LIKE 'e2e_%'`
+    // Run all deletes in one transaction so a mid-teardown failure can never leave
+    // children orphaned or users half-removed. Child rows (payment_requests,
+    // transactions) must go before their referenced users to satisfy FK constraints.
+    // NOTE: when a future story adds another table with an FK to users, add its
+    // cleanup here before the users delete or teardown will fail with a constraint
+    // violation (e.g. stories 4.3/4.4).
+    await sql.begin(async (tx) => {
+      await tx`
+        DELETE FROM payment_requests
+        WHERE requester_id IN (SELECT id FROM users WHERE username LIKE 'e2e_%')
+           OR recipient_id IN (SELECT id FROM users WHERE username LIKE 'e2e_%')
+      `
+      await tx`
+        DELETE FROM transactions
+        WHERE sender_id IN (SELECT id FROM users WHERE username LIKE 'e2e_%')
+           OR recipient_id IN (SELECT id FROM users WHERE username LIKE 'e2e_%')
+      `
+      await tx`DELETE FROM users WHERE username LIKE 'e2e_%'`
+    })
   } finally {
     await sql.end()
   }

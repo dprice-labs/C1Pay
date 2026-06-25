@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -41,6 +41,25 @@ export default function SendPage() {
   const [amountError, setAmountError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const isInitialMount = useRef(true)
+  const step1SectionRef = useRef<HTMLElement>(null)
+  const step2AmountRef = useRef<HTMLInputElement>(null)
+  const step3BackRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    if (step === 1) {
+      step1SectionRef.current?.querySelector<HTMLInputElement>('input')?.focus()
+    } else if (step === 2) {
+      step2AmountRef.current?.focus()
+    } else if (step === 3) {
+      step3BackRef.current?.focus()
+    }
+  }, [step])
 
   function handleSelectRecipient(user: Recipient) {
     setRecipient(user)
@@ -123,7 +142,7 @@ export default function SendPage() {
       </header>
 
       {step === 1 && (
-        <section aria-labelledby="step1-heading" className="flex flex-col gap-4">
+        <section ref={step1SectionRef} aria-labelledby="step1-heading" className="flex flex-col gap-4">
           <h2 id="step1-heading" className="sr-only">
             Step 1: Choose recipient
           </h2>
@@ -158,6 +177,7 @@ export default function SendPage() {
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="amount-input">Amount (USD)</Label>
               <Input
+                ref={step2AmountRef}
                 id="amount-input"
                 type="text"
                 inputMode="decimal"
@@ -229,7 +249,12 @@ export default function SendPage() {
           )}
 
           <div className="flex gap-3">
-            <Button variant="outline" onClick={handleBackFromStep3} disabled={submitting}>
+            <Button
+              ref={step3BackRef}
+              variant="outline"
+              onClick={handleBackFromStep3}
+              disabled={submitting}
+            >
               <ArrowLeft data-icon="inline-start" />
               Back
             </Button>

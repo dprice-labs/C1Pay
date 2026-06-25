@@ -24,7 +24,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         <NavLinks />
         <LogoutButton />
       </header>
-      <main id="main-content" className="flex flex-1 flex-col gap-4 p-4">{children}</main>
+      <main id="main-content" tabIndex={-1} className="flex flex-1 flex-col gap-4 p-4">{children}</main>
     </Providers>
   )
 }

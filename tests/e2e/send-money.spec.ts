@@ -39,12 +39,8 @@ test('send money flow — search, amount, confirm, balance updates', async ({ pa
 
   // Step 1: search and select recipient
   await page.getByLabel('Search for a recipient by username').fill(recipientName)
-  const resultButton = page
-    .getByRole('option')
-    .filter({ hasText: recipientName })
-    .getByRole('button')
-  await expect(resultButton).toBeVisible()
-  await resultButton.click()
+  await expect(page.getByRole('option').filter({ hasText: recipientName })).toBeVisible()
+  await page.getByRole('option').filter({ hasText: recipientName }).click()
 
   // Step 2: enter amount
   await expect(page.getByText('Step 2 of 3')).toBeVisible()
@@ -77,12 +73,8 @@ test('send money — insufficient balance shows explicit error', async ({ page }
   await expect(page).toHaveURL('/send')
 
   await page.getByLabel('Search for a recipient by username').fill(recipientName)
-  const resultButton = page
-    .getByRole('option')
-    .filter({ hasText: recipientName })
-    .getByRole('button')
-  await expect(resultButton).toBeVisible()
-  await resultButton.click()
+  await expect(page.getByRole('option').filter({ hasText: recipientName })).toBeVisible()
+  await page.getByRole('option').filter({ hasText: recipientName }).click()
 
   // Try to send more than balance ($1,000.00)
   await page.getByLabel('Amount (USD)').fill('9999')
