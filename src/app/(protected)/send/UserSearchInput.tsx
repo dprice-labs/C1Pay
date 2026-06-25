@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -100,7 +100,9 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
     }
   }
 
-  const listboxId = 'user-search-listbox'
+  const uid = useId()
+  const inputId = `${uid}input`
+  const listboxId = `${uid}listbox`
   const trimmedQuery = query.trim()
   const isExpanded = trimmedQuery.length > 0 && results.length > 0 && isOpen
   const statusMessage = loading
@@ -114,9 +116,9 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="user-search">Search by username</Label>
+        <Label htmlFor={inputId}>Search by username</Label>
         <Input
-          id="user-search"
+          id={inputId}
           type="search"
           autoComplete="off"
           placeholder="e.g. alice"
@@ -129,7 +131,7 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
           aria-haspopup="listbox"
           aria-expanded={isExpanded}
           aria-controls={listboxId}
-          aria-activedescendant={activeIndex >= 0 ? `user-option-${activeIndex}` : undefined}
+          aria-activedescendant={activeIndex >= 0 ? `${uid}option${activeIndex}` : undefined}
         />
       </div>
 
@@ -157,7 +159,7 @@ export function UserSearchInput({ onSelect }: UserSearchInputProps) {
             key={user.id}
             role="option"
             aria-selected={index === activeIndex}
-            id={`user-option-${index}`}
+            id={`${uid}option${index}`}
             onClick={() => onSelect(user)}
             className="w-full cursor-pointer rounded-md border bg-card px-4 py-2 text-sm hover:bg-accent"
           >
