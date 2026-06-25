@@ -164,7 +164,7 @@ export default function SendPage() {
           <h2 id="step2-heading" className="sr-only">
             Step 2: Enter amount
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm break-words text-muted-foreground">
             Sending to <strong>{recipient.username}</strong>
           </p>
           <form
@@ -224,9 +224,11 @@ export default function SendPage() {
             Step 3: Confirm transfer
           </h2>
           <div className="rounded-xl border bg-card p-4 text-card-foreground flex flex-col gap-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">To</span>
-              <strong>{recipient.username}</strong>
+            <div className="flex justify-between gap-4 text-sm">
+              <span className="shrink-0 text-muted-foreground">To</span>
+              {/* min-w-0 + break-words: a long recipient username wraps rather than overflowing —
+                  never truncated on the confirm screen, where you must see exactly who you're paying. */}
+              <strong className="min-w-0 break-words text-right">{recipient.username}</strong>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Amount</span>
@@ -235,9 +237,11 @@ export default function SendPage() {
               </strong>
             </div>
             {note.trim() && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Note</span>
-                <span className="text-right max-w-xs">{note.trim()}</span>
+              <div className="flex justify-between gap-4 text-sm">
+                <span className="shrink-0 text-muted-foreground">Note</span>
+                {/* min-w-0 + break-words: a long unbroken note wraps rather than
+                    overflowing the confirm card at mobile (mirrors the To row above). */}
+                <span className="min-w-0 break-words text-right">{note.trim()}</span>
               </div>
             )}
           </div>
