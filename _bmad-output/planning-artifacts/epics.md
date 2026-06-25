@@ -582,7 +582,7 @@ So that I understand what is pending and can decide how to act on each.
 
 **Given** `GET /api/requests`, **When** called by an authenticated user, **Then** it returns that user's pending incoming requests (FR16)
 
-**Given** the `/requests` inbox page, **When** rendered, **Then** it lists each pending incoming request via `RequestCard`, showing the requester username, amount via `AmountDisplay`, optional note, and timestamp
+**Given** the `/inbox` page, **When** rendered, **Then** it lists each pending incoming request via `RequestCard`, showing the requester username, amount via `AmountDisplay`, optional note, and timestamp
 
 **Given** a `RequestCard`, **Then** the request state is rendered with an explicit labelled status badge — a text label (`PENDING`, `PAID`, `DECLINED`, `CANCELLED`) plus a subtle colour — never colour alone (UX-DR3)
 
@@ -636,7 +636,7 @@ So that I can withdraw it before the recipient acts on it.
 
 **Given** `src/lib/requests.ts`, **Then** it exports `getOutgoingRequests(userId: number): Promise<PaymentRequest[]>` returning the user's `PENDING` requests they created, and `cancelRequest(requestId, userId)`
 
-**Given** the `/requests` view, **When** rendered, **Then** it surfaces the user's outgoing pending requests (as a distinct section or tab from the incoming inbox), each showing recipient, amount, note, timestamp, and a labelled status badge (UX-DR3)
+**Given** the `/inbox` page, **When** rendered, **Then** it surfaces the user's outgoing pending requests in a section distinct from the incoming list, each showing recipient, amount, note, timestamp, and a labelled status badge (UX-DR3)
 
 **Given** `cancelRequest` runs for a `PENDING` request where the caller is the requester, **When** executed, **Then** it sets `status = CANCELLED` with `resolved_at = now()` and no funds move (FR19)
 

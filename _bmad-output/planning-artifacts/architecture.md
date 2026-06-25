@@ -487,8 +487,8 @@ c1pay/
 │   │   │   ├── request/
 │   │   │   │   ├── page.tsx            # FR15: create payment request page
 │   │   │   │   └── CreateRequestForm.tsx
-│   │   │   ├── requests/
-│   │   │   │   ├── page.tsx            # FR16, FR25: inbox — pending incoming requests
+│   │   │   ├── inbox/
+│   │   │   │   ├── page.tsx            # FR16, FR19, FR25: incoming + outgoing pending requests
 │   │   │   │   └── RequestCard.tsx     # FR17–18: Pay / Decline actions (Client Component)
 │   │   │   └── history/
 │   │   │       ├── page.tsx            # FR23–24: transaction history (Server Component)
@@ -612,7 +612,7 @@ c1pay/
 | FR1–5 | Auth & identity | `src/lib/auth.ts`, `src/app/api/auth/`, `src/middleware.ts` |
 | FR6–9 | Balance management | `src/db/schema/users.ts` (balance_cents), `src/lib/transactions.ts` |
 | FR10–14 | Send money | `src/lib/transactions.ts`, `src/app/api/transactions/`, `src/app/(protected)/send/` |
-| FR15–22 | Request flow + state machine | `src/lib/requests.ts`, `src/app/api/requests/`, `src/app/(protected)/request/`, `src/app/(protected)/requests/` |
+| FR15–22 | Request flow + state machine | `src/lib/requests.ts`, `src/app/api/requests/`, `src/app/(protected)/request/`, `src/app/(protected)/inbox/` |
 | FR23–25 | Activity & history | `src/lib/transactions.ts`, `src/app/api/transactions/`, `src/app/(protected)/history/` |
 | FR26–29 | Real-time SSE | `src/lib/sse-emitter.ts`, `src/app/api/sse/`, `src/store/balance.ts`, `src/store/requests.ts` |
 | FR30–32 | UI & accessibility | All page and component files; Tailwind responsive utilities |
