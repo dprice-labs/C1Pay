@@ -13,19 +13,22 @@ export function TransactionRow({ item }: { item: TransactionHistoryItem }) {
 
   return (
     <div className="flex items-center justify-between gap-4 rounded-lg border bg-card p-3 text-card-foreground">
-      <div className="flex items-center gap-3">
+      {/* min-w-0 lets the identity column shrink below its content so `truncate` can ellipsise
+          a long username instead of overflowing the row (flex children default to min-width:auto). */}
+      <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
           <Icon aria-hidden="true" className="size-4" />
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="font-medium">{item.counterpartyUsername}</span>
-          <span className="text-xs text-muted-foreground">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate font-medium">{item.counterpartyUsername}</span>
+          <span className="truncate text-xs text-muted-foreground">
             {label} transaction
             {item.note ? ` · ${item.note}` : ''}
           </span>
         </div>
       </div>
-      <div className="flex flex-col items-end gap-0.5">
+      {/* shrink-0: the amount must never be the thing that gets clipped — money stays fully legible. */}
+      <div className="flex shrink-0 flex-col items-end gap-0.5">
         <AmountDisplay cents={item.amountCents} className="font-medium" />
         <time dateTime={item.createdAt.toISOString()} className="text-xs text-muted-foreground">
           {dateFmt.format(item.createdAt)}
