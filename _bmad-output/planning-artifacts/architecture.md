@@ -295,7 +295,7 @@ NOT included in starter. Official Next.js recommendation is Vitest (unit + integ
 
 **TypeScript / Code:**
 - Variables and functions: `camelCase`
-- React components: `PascalCase`, files `PascalCase.tsx` — `SendMoneyForm.tsx`
+- React components: `PascalCase`, files `PascalCase.tsx` — `RequestCard.tsx`
 - Utility/lib files: `kebab-case.ts` — `sse-emitter.ts`, `auth-utils.ts`
 - Zod schemas: `{noun}Schema` for entity shapes, `{verb}{Noun}Schema` for input validation — `userSchema`, `sendMoneySchema`, `createRequestSchema`
 - Zustand stores: `use{Domain}Store` — `useAuthStore`, `useBalanceStore`, `useRequestStore`
@@ -481,12 +481,12 @@ c1pay/
 │   │   │   │                           # mounts SSE client hook, wraps with Zustand providers
 │   │   │   ├── page.tsx                # home: balance display, inbox badge, Send/Request CTAs
 │   │   │   ├── send/
-│   │   │   │   ├── page.tsx            # FR10–14: send money page
-│   │   │   │   ├── UserSearchInput.tsx # FR10: username search (Client Component)
-│   │   │   │   └── SendMoneyForm.tsx   # FR11–13: amount + note + confirm (Client Component)
+│   │   │   │   ├── page.tsx            # FR10–14: send money page — 3-step flow + amount/note/confirm
+│   │   │   │   │                       #   state inline (Client Component); no separate form file
+│   │   │   │   └── UserSearchInput.tsx # FR10: username search (Client Component)
 │   │   │   ├── request/
-│   │   │   │   ├── page.tsx            # FR15: create payment request page
-│   │   │   │   └── CreateRequestForm.tsx
+│   │   │   │   └── page.tsx            # FR15: create payment request page — form state inline
+│   │   │   │                           #   (Client Component); no separate form file
 │   │   │   ├── inbox/
 │   │   │   │   ├── page.tsx            # FR16, FR19, FR25: incoming + outgoing pending requests
 │   │   │   │   └── RequestCard.tsx     # FR17–18: Pay / Decline actions (Client Component)

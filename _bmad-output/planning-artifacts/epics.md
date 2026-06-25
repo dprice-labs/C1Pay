@@ -558,7 +558,7 @@ So that a pending request appears in their inbox for them to act on.
 
 **Given** `createRequest` where `requesterId === recipientId`, **Then** it throws an `AppError` with code `SELF_REQUEST`
 
-**Given** the `/request` page, **When** rendered, **Then** it presents a flow to select a recipient via `UserSearchInput`, enter an amount and optional note in `CreateRequestForm`, and submit — calling `POST /api/requests` with `{ recipientId, amountCents, note? }` validated by `createRequestSchema` (Zod)
+**Given** the `/request` page, **When** rendered, **Then** it presents a flow to select a recipient via `UserSearchInput`, enter an amount and optional note, and submit — calling `POST /api/requests` with `{ recipientId, amountCents, note? }` validated by `createRequestSchema` (Zod)
 
 **Given** `POST /api/requests` succeeds, **When** the request is created, **Then** it returns `201` and the user is returned to home; validation failure returns `400 { "code": "VALIDATION_ERROR" }`
 
