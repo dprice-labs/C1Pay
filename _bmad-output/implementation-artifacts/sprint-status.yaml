@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-24  # story 6.1 done (code review patches applied)
+last_updated: 2026-06-25  # story 6.2 review
 project: C1Pay
 
 
@@ -87,7 +87,7 @@ development_status:
   # ── Epic 6: Accessibility & Responsive Design ─────────────────────────────────
   epic-6: in-progress
   6-1-semantic-structure-aria-and-contrast-baseline: done
-  6-2-keyboard-first-navigation-across-core-flows: backlog
+  6-2-keyboard-first-navigation-across-core-flows: review
   6-3-responsive-layout-mobile-tablet-desktop: backlog
   6-4-automated-wcag-aa-audit-gate: done
   epic-6-retrospective: optional

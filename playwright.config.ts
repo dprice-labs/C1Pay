@@ -7,6 +7,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // Limit concurrency in CI: a single dev server handles requests sequentially
+  // enough that 19 parallel workers cause navigation timeouts on first run.
+  workers: process.env.CI ? 3 : undefined,
   reporter: 'list',
   use: {
     baseURL: 'http://localhost:3000',

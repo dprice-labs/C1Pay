@@ -57,11 +57,8 @@ test('recipient balance updates live when money is sent', async ({ browser }) =>
     // (not "link") — select by its button role accordingly.
     await pageA.getByRole('button', { name: 'Send', exact: true }).click()
     await pageA.getByLabel('Search for a recipient by username').fill(recipient)
-    await pageA
-      .getByRole('option')
-      .filter({ hasText: recipient })
-      .getByRole('button')
-      .click()
+    await expect(pageA.getByRole('option').filter({ hasText: recipient })).toBeVisible()
+    await pageA.getByRole('option').filter({ hasText: recipient }).click()
     await pageA.getByLabel('Amount (USD)').fill('25')
     await pageA.getByRole('button', { name: 'Continue' }).click()
     await pageA.getByRole('button', { name: 'Confirm & Send' }).click()
