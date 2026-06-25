@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-25  # story 6.3 → done (code review)
+last_updated: 2026-06-25  # story 6.5 drafted → backlog (blocked on Epic 4)
 project: C1Pay
 
 
@@ -90,6 +90,7 @@ development_status:
   6-2-keyboard-first-navigation-across-core-flows: done
   6-3-responsive-layout-mobile-tablet-desktop: done
   6-4-automated-wcag-aa-audit-gate: done
+  6-5-post-epic-4-accessibility-responsive-verification-sweep: backlog  # BLOCKED on Epic 4 (4.3/4.4/4.5) — verification net; flip to ready-for-dev once Epic 4 is done
   epic-6-retrospective: optional
 
   # ── Epic 7 (Phase 2): Learning Layer ─────────────────────────────────────────
