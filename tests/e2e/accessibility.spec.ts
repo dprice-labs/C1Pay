@@ -78,3 +78,30 @@ test('authenticated pages have zero violations', async ({ page }) => {
   await page.goto('/history')
   await auditPage(page, '/history', page.getByRole('heading', { name: 'Transaction history', level: 1 }))
 })
+
+test('send page combobox has zero violations when expanded', async ({ page }) => {
+  const suffix = uniqueSuffix()
+  const searcher = `e2e_a11y_s_${suffix}`
+  const target = `e2e_a11y_t_${suffix}`
+
+  // Register a searchable target account, then the searcher.
+  await register(page, target)
+  await register(page, searcher)
+  await login(page, searcher)
+
+  await page.goto('/send')
+  await expect(page.getByRole('heading', { name: 'Send money', level: 1 })).toBeVisible()
+
+  // Type a prefix that will match target, triggering the listbox to expand.
+  await page.getByRole('combobox', { name: 'Search for a recipient by username' }).fill('e2e_a11y_t_')
+
+  // Wait for at least one option to appear before scanning.
+  await expect(page.getByRole('listbox', { name: 'Matching users' })).toBeVisible()
+  await expect(page.getByRole('option').first()).toBeVisible()
+
+  const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze()
+  expect(
+    results.violations,
+    formatViolations(results.violations, '/send (combobox expanded)'),
+  ).toEqual([])
+})
