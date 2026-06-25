@@ -35,7 +35,7 @@ export const createRequestSchema = z.object({
 export type CreateRequestInput = z.infer<typeof createRequestSchema>
 
 export const patchRequestSchema = z.object({
-  action: z.enum(['pay', 'decline']),
+  action: z.enum(['pay', 'decline', 'cancel']),
 })
 
 export type PatchRequestInput = z.infer<typeof patchRequestSchema>

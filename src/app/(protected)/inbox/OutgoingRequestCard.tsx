@@ -1,53 +1,45 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, X, MailOpen } from 'lucide-react'
+import { Send, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { AmountDisplay, formatCents } from '@/components/ui/AmountDisplay'
+import { AmountDisplay } from '@/components/ui/AmountDisplay'
 import { Button } from '@/components/ui/button'
-import { useBalanceStore } from '@/store/balance'
 import { formatDateTime } from '@/lib/format'
-import type { InboxRequestItem } from '@/lib/requests'
+import type { OutgoingRequestItem } from '@/lib/requests'
 import { RequestLifecycleIndicator } from './RequestLifecycleIndicator'
 
-export function RequestCard({ item }: { item: InboxRequestItem }) {
+export function OutgoingRequestCard({ item }: { item: OutgoingRequestItem }) {
   const router = useRouter()
-  const balanceCents = useBalanceStore((state) => state.balanceCents)
-  const [isPaying, setIsPaying] = useState(false)
-  const [isDeclining, setIsDeclining] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const canPay = balanceCents >= item.amountCents
-  const isActing = isPaying || isDeclining
-
-  async function handleAction(action: 'pay' | 'decline') {
+  async function handleCancel() {
     setError(null)
-    if (action === 'pay') setIsPaying(true)
-    else setIsDeclining(true)
+    setIsCancelling(true)
 
     try {
       const res = await fetch(`/api/requests/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action: 'cancel' }),
       })
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        const msg =
-          data.code === 'INSUFFICIENT_BALANCE'
-            ? `Insufficient balance — you have ${formatCents(balanceCents)}, this request is for ${formatCents(item.amountCents)}`
-            : (data.error ?? 'Something went wrong. Please try again.')
-        setError(msg)
+        setError(data.error ?? 'Something went wrong. Please try again.')
+        setIsCancelling(false)
         return
       }
 
+      // Leave isCancelling true (button stays disabled) — router.refresh() is about to
+      // remove this card from the list once the server data re-fetches. Resetting it here
+      // would re-enable the button for the brief window before that happens, letting a
+      // fast double-click fire a second PATCH against an already-CANCELLED request.
       router.refresh()
     } catch {
       setError('Network error. Please try again.')
-    } finally {
-      setIsPaying(false)
-      setIsDeclining(false)
+      setIsCancelling(false)
     }
   }
 
@@ -55,13 +47,13 @@ export function RequestCard({ item }: { item: InboxRequestItem }) {
     <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-card-foreground">
       <div className="flex items-center justify-between gap-4">
         {/* min-w-0 on the identity column + its inner stack so `truncate` actually clips a long
-            requester username (flex children default to min-width:auto and won't shrink otherwise). */}
+            recipient username (flex children default to min-width:auto and won't shrink otherwise). */}
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-            <MailOpen aria-hidden="true" className="size-4" />
+            <Send aria-hidden="true" className="size-4" />
           </div>
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="truncate font-medium">{item.requesterUsername}</span>
+            <span className="truncate font-medium">{item.recipientUsername}</span>
             <span className="truncate text-xs text-muted-foreground">
               Payment request{item.note ? ` · ${item.note}` : ''}
             </span>
@@ -78,14 +70,6 @@ export function RequestCard({ item }: { item: InboxRequestItem }) {
 
       <RequestLifecycleIndicator />
 
-      {/* Balance gate message — explicit reason, never just a disabled state (UX-DR7) */}
-      {!canPay && (
-        <p className="text-xs text-destructive" role="alert">
-          Insufficient balance — you have {formatCents(balanceCents)}, this request is for{' '}
-          {formatCents(item.amountCents)}
-        </p>
-      )}
-
       {error && (
         <p className="text-xs text-destructive" role="alert">
           {error}
@@ -94,24 +78,14 @@ export function RequestCard({ item }: { item: InboxRequestItem }) {
 
       <div className="flex gap-2">
         <Button
-          size="sm"
-          disabled={!canPay || isActing}
-          aria-disabled={!canPay || isActing}
-          aria-busy={isPaying}
-          onClick={() => handleAction('pay')}
-        >
-          <Check data-icon="inline-start" />
-          {isPaying ? 'Paying…' : 'Pay'}
-        </Button>
-        <Button
           variant="outline"
           size="sm"
-          disabled={isActing}
-          aria-busy={isDeclining}
-          onClick={() => handleAction('decline')}
+          disabled={isCancelling}
+          aria-busy={isCancelling}
+          onClick={handleCancel}
         >
           <X data-icon="inline-start" />
-          {isDeclining ? 'Declining…' : 'Decline'}
+          {isCancelling ? 'Cancelling…' : 'Cancel'}
         </Button>
       </div>
     </div>

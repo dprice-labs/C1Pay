@@ -1,8 +1,7 @@
 import { ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
+import { formatDateTime } from '@/lib/format'
 import type { TransactionHistoryItem } from '@/lib/transactions'
-
-const dateFmt = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' })
 
 // Presentational, no interactivity → a Server Component is fine (no 'use client').
 export function TransactionRow({ item }: { item: TransactionHistoryItem }) {
@@ -31,7 +30,7 @@ export function TransactionRow({ item }: { item: TransactionHistoryItem }) {
       <div className="flex shrink-0 flex-col items-end gap-0.5">
         <AmountDisplay cents={item.amountCents} className="font-medium" />
         <time dateTime={item.createdAt.toISOString()} className="text-xs text-muted-foreground">
-          {dateFmt.format(item.createdAt)}
+          {formatDateTime(item.createdAt)}
         </time>
       </div>
     </div>

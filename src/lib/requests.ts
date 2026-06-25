@@ -22,8 +22,24 @@ export interface InboxRequestItem {
   createdAt: Date
 }
 
-// Module-scope alias avoids recreating the join target on every call.
+/**
+ * A pending request as seen by the requester. Recipient username is resolved
+ * via join at query time — no N+1 per-row lookups (NFR3).
+ */
+export interface OutgoingRequestItem {
+  id: number
+  recipientUsername: string
+  amountCents: number
+  note: string | null
+  createdAt: Date
+}
+
+// Module-scope aliases avoid recreating the join target on every call.
 const requesterUser = alias(users, 'requester_user')
+const recipientUser = alias(users, 'recipient_user')
+
+// Shared ordering for both pending-request views — newest first, id as tiebreaker.
+const PENDING_REQUEST_ORDER = [desc(paymentRequests.createdAt), desc(paymentRequests.id)] as const
 
 export async function createRequest(
   requesterId: number,
@@ -72,9 +88,38 @@ export async function getInboxRequests(
         eq(paymentRequests.status, 'PENDING'),
       ),
     )
-    .orderBy(desc(paymentRequests.createdAt), desc(paymentRequests.id))
+    .orderBy(...PENDING_REQUEST_ORDER)
 
   log.info(`getInboxRequests userId=${userId} → ${rows.length} rows`)
+  return rows
+}
+
+/**
+ * Pending outgoing requests for a user, newest-first. Recipient username is
+ * resolved in the same query — no N+1 per-row lookups (NFR3).
+ */
+export async function getOutgoingRequests(
+  userId: number,
+): Promise<OutgoingRequestItem[]> {
+  const rows = await db
+    .select({
+      id: paymentRequests.id,
+      amountCents: paymentRequests.amountCents,
+      note: paymentRequests.note,
+      createdAt: paymentRequests.createdAt,
+      recipientUsername: recipientUser.username,
+    })
+    .from(paymentRequests)
+    .innerJoin(recipientUser, eq(paymentRequests.recipientId, recipientUser.id))
+    .where(
+      and(
+        eq(paymentRequests.requesterId, userId),
+        eq(paymentRequests.status, 'PENDING'),
+      ),
+    )
+    .orderBy(...PENDING_REQUEST_ORDER)
+
+  log.info(`getOutgoingRequests userId=${userId} → ${rows.length} rows`)
   return rows
 }
 
@@ -157,13 +202,19 @@ export async function payRequest(requestId: number, userId: number): Promise<Pay
 }
 
 /**
- * Decline a PENDING request. Sets status = DECLINED with resolved_at = now().
- * No funds move. Caller must be the recipient of the request.
- * Wrapped in a transaction with FOR UPDATE so a concurrent payRequest cannot
- * commit between the status check and the status update.
+ * Shared no-funds-move resolution path for declineRequest/cancelRequest: lock the
+ * request row, verify the caller is the authorized party, verify it's still PENDING,
+ * then set the terminal status. Wrapped in a transaction with FOR UPDATE so a
+ * concurrent payRequest/declineRequest/cancelRequest cannot commit between the
+ * status check and the status update.
  */
-export async function declineRequest(requestId: number, userId: number): Promise<PaymentRequest> {
-  const updated = await db.transaction(async (tx) => {
+async function resolveRequestGuarded(
+  requestId: number,
+  userId: number,
+  authorizedField: 'recipientId' | 'requesterId',
+  terminalStatus: 'DECLINED' | 'CANCELLED',
+): Promise<PaymentRequest> {
+  return await db.transaction(async (tx) => {
     const [request] = await tx
       .select()
       .from(paymentRequests)
@@ -172,7 +223,7 @@ export async function declineRequest(requestId: number, userId: number): Promise
 
     if (!request) throw new AppError('Request not found', 'REQUEST_NOT_FOUND', 404)
     // Auth check before status check — unauthorized callers should not learn whether the request is resolved.
-    if (request.recipientId !== userId) {
+    if (request[authorizedField] !== userId) {
       throw new AppError('Forbidden', 'FORBIDDEN', 403)
     }
     if (request.status !== 'PENDING') {
@@ -181,7 +232,7 @@ export async function declineRequest(requestId: number, userId: number): Promise
 
     const [updatedRequest] = await tx
       .update(paymentRequests)
-      .set({ status: 'DECLINED', resolvedAt: sql`NOW()` })
+      .set({ status: terminalStatus, resolvedAt: sql`NOW()` })
       .where(and(eq(paymentRequests.id, requestId), eq(paymentRequests.status, 'PENDING')))
       .returning()
 
@@ -189,7 +240,24 @@ export async function declineRequest(requestId: number, userId: number): Promise
 
     return updatedRequest
   })
+}
 
+/**
+ * Decline a PENDING request. Sets status = DECLINED with resolved_at = now().
+ * No funds move. Caller must be the recipient of the request.
+ */
+export async function declineRequest(requestId: number, userId: number): Promise<PaymentRequest> {
+  const updated = await resolveRequestGuarded(requestId, userId, 'recipientId', 'DECLINED')
   log.info(`declineRequest: requestId=${requestId} userId=${userId}`)
+  return updated
+}
+
+/**
+ * Cancel a PENDING request. Sets status = CANCELLED with resolved_at = now().
+ * No funds move. Caller must be the requester (not the recipient).
+ */
+export async function cancelRequest(requestId: number, userId: number): Promise<PaymentRequest> {
+  const updated = await resolveRequestGuarded(requestId, userId, 'requesterId', 'CANCELLED')
+  log.info(`cancelRequest: requestId=${requestId} userId=${userId}`)
   return updated
 }

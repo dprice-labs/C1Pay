@@ -12,6 +12,7 @@ vi.mock('@/lib/requests', () => ({
   createRequest: vi.fn(),
   payRequest: vi.fn(),
   declineRequest: vi.fn(),
+  cancelRequest: vi.fn(),
 }))
 vi.mock('@/lib/transactions', () => ({
   sendMoney: vi.fn(),

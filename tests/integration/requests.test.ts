@@ -5,7 +5,14 @@ import { paymentRequests } from '@/db/schema/requests'
 import { transactions } from '@/db/schema/transactions'
 import { eq, or } from 'drizzle-orm'
 import { createUser } from '@/lib/users'
-import { createRequest, getInboxRequests, payRequest, declineRequest } from '@/lib/requests'
+import {
+  createRequest,
+  getInboxRequests,
+  getOutgoingRequests,
+  payRequest,
+  declineRequest,
+  cancelRequest,
+} from '@/lib/requests'
 
 const REQUESTER_USERNAME = '__req_test_requester__'
 const RECIPIENT_USERNAME = '__req_test_recipient__'
@@ -172,6 +179,64 @@ describe('getInboxRequests integration', () => {
   })
 })
 
+describe('getOutgoingRequests integration', () => {
+  it('returns PENDING outgoing requests with resolved recipient username', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+
+    await createRequest(requester.id, recipient.id, 7500, 'lunch')
+
+    const items = await getOutgoingRequests(requester.id)
+
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({
+      recipientUsername: RECIPIENT_USERNAME,
+      amountCents: 7500,
+      note: 'lunch',
+    })
+    expect(items[0]!.id).toBeTypeOf('number')
+    expect(items[0]!.createdAt).toBeInstanceOf(Date)
+  })
+
+  it('excludes incoming requests (user is recipient, not requester)', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+
+    await createRequest(requester.id, recipient.id, 5000)
+
+    const items = await getOutgoingRequests(recipient.id)
+
+    expect(items).toHaveLength(0)
+  })
+
+  it.each([
+    ['PAID'],
+    ['DECLINED'],
+    ['CANCELLED'],
+  ] as const)('excludes %s requests', async (status) => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+
+    const req = await createRequest(requester.id, recipient.id, 3000)
+    await db
+      .update(paymentRequests)
+      .set({ status })
+      .where(eq(paymentRequests.id, req.id))
+
+    const items = await getOutgoingRequests(requester.id)
+
+    expect(items).toHaveLength(0)
+  })
+
+  it('returns empty array when no pending requests exist', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+
+    const items = await getOutgoingRequests(requester.id)
+
+    expect(items).toHaveLength(0)
+  })
+})
+
 describe('payRequest integration', () => {
   it('debits payer, credits requester, inserts transactions row, and sets status PAID', async () => {
     // requester requests 5000 from recipient; recipient pays
@@ -282,5 +347,63 @@ describe('declineRequest integration', () => {
     // Request removed from active inbox
     const inbox = await getInboxRequests(recipient.id)
     expect(inbox).toHaveLength(0)
+  })
+})
+
+describe('cancelRequest integration', () => {
+  it('sets status CANCELLED with resolvedAt and no balance changes', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+    const req = await createRequest(requester.id, recipient.id, 3000)
+
+    const result = await cancelRequest(req.id, requester.id)
+
+    expect(result.status).toBe('CANCELLED')
+    expect(result.resolvedAt).toBeInstanceOf(Date)
+
+    // Balances unchanged — no funds moved
+    const [updatedRecipient] = await db.select().from(users).where(eq(users.id, recipient.id))
+    const [updatedRequester] = await db.select().from(users).where(eq(users.id, requester.id))
+    expect(updatedRecipient!.balanceCents).toBe(100000)
+    expect(updatedRequester!.balanceCents).toBe(100000)
+
+    // No transactions row inserted
+    const txRows = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.senderId, requester.id))
+    expect(txRows).toHaveLength(0)
+
+    // Request removed from active outgoing list
+    const outgoing = await getOutgoingRequests(requester.id)
+    expect(outgoing).toHaveLength(0)
+  })
+
+  it('throws FORBIDDEN when caller is not the requester', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+    const req = await createRequest(requester.id, recipient.id, 3000)
+
+    await expect(cancelRequest(req.id, recipient.id)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
+
+    // Request still PENDING
+    const [req2] = await db.select().from(paymentRequests).where(eq(paymentRequests.id, req.id))
+    expect(req2!.status).toBe('PENDING')
+  })
+
+  it('throws REQUEST_ALREADY_RESOLVED when the request is already resolved', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+    const req = await createRequest(requester.id, recipient.id, 1000)
+
+    // Cancel once
+    await cancelRequest(req.id, requester.id)
+
+    // Attempt to cancel again
+    await expect(cancelRequest(req.id, requester.id)).rejects.toMatchObject({
+      code: 'REQUEST_ALREADY_RESOLVED',
+    })
   })
 })

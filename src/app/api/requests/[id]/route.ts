@@ -1,10 +1,18 @@
 import { getAuthUser } from '@/lib/auth'
-import { payRequest, declineRequest } from '@/lib/requests'
-import { patchRequestSchema } from '@/lib/schemas'
+import { payRequest, declineRequest, cancelRequest } from '@/lib/requests'
+import { patchRequestSchema, type PatchRequestInput } from '@/lib/schemas'
 import { errorResponse, AppError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('requests-id-route')
+
+// Exhaustive over patchRequestSchema's action enum — adding a 4th action requires
+// adding a map entry here, and TypeScript errors if one is missing.
+const ACTION_HANDLERS: Record<PatchRequestInput['action'], typeof payRequest> = {
+  pay: payRequest,
+  decline: declineRequest,
+  cancel: cancelRequest,
+}
 
 export async function PATCH(
   request: Request,
@@ -39,10 +47,7 @@ export async function PATCH(
 
   try {
     const { action } = parsed.data
-    const updated =
-      action === 'pay'
-        ? await payRequest(requestId, userId)
-        : await declineRequest(requestId, userId)
+    const updated = await ACTION_HANDLERS[action](requestId, userId)
 
     log.info(`PATCH /api/requests/${requestId} action=${action} userId=${userId}`)
     return Response.json(updated)
