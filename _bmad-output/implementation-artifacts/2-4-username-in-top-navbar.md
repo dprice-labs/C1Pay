@@ -4,7 +4,7 @@ baseline_commit: 9258804f90772de0646440c8933c3f14d09d174c
 
 # Story 2-4: Display Username in Top Navbar
 
-**Status:** in-progress
+**Status:** review
 **GitHub Issue:** #39
 **Epic:** 2 — Home Screen & Real-Time Foundation
 

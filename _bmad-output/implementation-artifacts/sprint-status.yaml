@@ -59,7 +59,7 @@ development_status:
   2-1-protected-layout-and-zustand-foundation: done
   2-2-home-screen-ui: done
   2-3-sse-connection-and-real-time-updates: done
-  2-4-username-in-top-navbar: ready-for-dev  # GH #39
+  2-4-username-in-top-navbar: review  # GH #39
   epic-2-retrospective: optional
 
   # ── Epic 3: Send Money & Transaction History ──────────────────────────────────
