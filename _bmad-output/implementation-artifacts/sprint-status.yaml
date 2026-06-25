@@ -81,7 +81,7 @@ development_status:
   # ── Epic 5: Batch Administration ─────────────────────────────────────────────
   epic-5: in-progress
   5-1-batch-create-test-accounts: done
-  5-2-reset-test-accounts: review
+  5-2-reset-test-accounts: done
   epic-5-retrospective: optional
 
   # ── Epic 6: Accessibility & Responsive Design ─────────────────────────────────
