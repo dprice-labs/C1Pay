@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import RegisterForm from './RegisterForm'
 
 export default function RegisterPage() {
@@ -6,7 +6,7 @@ export default function RegisterPage() {
     <main className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Create account</CardTitle>
+          <h1 data-slot="card-title" className="font-heading text-base font-medium leading-snug">Create account</h1>
         </CardHeader>
         <CardContent>
           <RegisterForm />
