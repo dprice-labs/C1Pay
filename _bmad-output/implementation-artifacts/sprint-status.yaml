@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-25  # story 4.3 → done
+last_updated: 2026-06-25  # story 4.3 → done; story 2.4 created (GH #39)
 project: C1Pay
 
 
@@ -59,6 +59,7 @@ development_status:
   2-1-protected-layout-and-zustand-foundation: done
   2-2-home-screen-ui: done
   2-3-sse-connection-and-real-time-updates: done
+  2-4-username-in-top-navbar: ready-for-dev  # GH #39
   epic-2-retrospective: optional
 
   # ── Epic 3: Send Money & Transaction History ──────────────────────────────────
