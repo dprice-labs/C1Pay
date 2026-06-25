@@ -111,8 +111,8 @@ Add/update unit tests in `tests/unit/` (or wherever route handler tests live) co
 
 ### Code Review
 - Completed: 2026-06-25
-- Duration: —
-- Tokens: —
+- Duration: 8 min
+- Tokens: 99,837 (in: 65 / out: 99,772)
 
 ---
 
