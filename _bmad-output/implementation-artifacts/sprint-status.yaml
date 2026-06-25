@@ -94,6 +94,9 @@ development_status:
   6-5-post-epic-4-accessibility-responsive-verification-sweep: backlog  # BLOCKED on Epic 4 (4.3/4.4/4.5) — verification net; flip to ready-for-dev once Epic 4 is done
   epic-6-retrospective: optional
 
+  # ── Bug Fixes ────────────────────────────────────────────────────────────────
+  bug-22-auth-infra-errors-return-401: done  # GH #22
+
   # ── Epic 7 (Phase 2): Learning Layer ─────────────────────────────────────────
   epic-7: backlog
   7-1-architectural-decision-records: backlog
