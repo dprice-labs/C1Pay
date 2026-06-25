@@ -136,3 +136,11 @@
 - ~~**`tabIndex={0}` on option `<button>` adds spurious tab stop**~~ — **RESOLVED (2026-06-24):** removed with the `<button>` element above; tab focus now stays in the combobox input.
 - ~~**Escape key not handled in `handleKeyDown`**~~ — **RESOLVED (2026-06-24):** Escape now sets `isOpen(false)` and clears `activeIndex` in `UserSearchInput.handleKeyDown`.
 - ~~**Duplicate `aria-label="Main"` landmark if any child page adds a competing nav**~~ — **RESOLVED (2026-06-24):** audited all protected routes in Story 6.1; no competing nav landmark exists.
+
+## Deferred from: code review of 6-2-keyboard-first-navigation (2026-06-25)
+
+_All three items below were fixed in the same review pass (not deferred) at user direction; verified by the full containerised e2e suite (20/20 green)._
+
+- ~~`playwright.config.ts` `workers: 3` is a CI flakiness mitigation, not a root-cause fix — a single `next dev` server serializes requests under load.~~ — **RESOLVED (2026-06-25):** CI now serves a production build (`next build && next start`); `next start` handles concurrency, so the artificial worker cap was removed. Required fixing a pre-existing latent build error in `src/app/api/requests/route.ts` (`log.error` called with 2 args) that `next dev` never type-checked.
+- ~~`src/components/ui/button.tsx` (`Button`) wraps Base UI `ButtonPrimitive` without `forwardRef`, forcing the step-3 Back button to be wrapped in a `<div ref>` + `querySelector('button')?.focus()`.~~ — **RESOLVED (2026-06-25):** Base UI `Button` is a `ForwardRefExoticComponent`; `ref` flows through the wrapper's `{...props}` (same as `Input`). Wrapper `<div>` removed in both `send/page.tsx` and `request/page.tsx`; Back button takes `ref={step3BackRef}` directly.
+- ~~`tests/e2e/global-teardown.ts` deletes `payment_requests` and `transactions` before `users` in three separate non-transactional statements.~~ — **RESOLVED (2026-06-25):** the three deletes now run inside `sql.begin()` (atomic); a NOTE comment instructs future stories to add new FK-child cleanup before the users delete.

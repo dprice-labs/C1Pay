@@ -80,9 +80,13 @@ test('send money — keyboard only', async ({ page }) => {
   await page.goto('/send')
   await expect(page.getByRole('heading', { name: 'Send money', level: 1 })).toBeVisible()
 
-  // Step 1: search + select via keyboard
+  // Step 1: search + select via keyboard.
+  // Type the full suffixed username so the prefix `ilike` match resolves to this
+  // test's own target only — a bare `e2e_kb_t_` prefix would also match targets
+  // created by other parallel workers (and prior un-torn-down runs), making the
+  // selected `results[0]` non-deterministic.
   await page.getByRole('combobox', { name: 'Search for a recipient by username' }).focus()
-  await page.keyboard.type(`e2e_kb_t_`)
+  await page.keyboard.type(target)
   await expect(page.getByRole('option').first()).toBeVisible()
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Enter')
@@ -116,8 +120,10 @@ test('request money — keyboard only', async ({ page }) => {
   await page.goto('/request')
   await expect(page.getByRole('heading', { name: 'Request money', level: 1 })).toBeVisible()
 
+  // Full suffixed username scopes the prefix search to this test's own target
+  // (see send-money test above for why a bare prefix is non-deterministic).
   await page.getByRole('combobox', { name: 'Search for a recipient by username' }).focus()
-  await page.keyboard.type(`e2e_kb_rt_`)
+  await page.keyboard.type(target)
   await expect(page.getByRole('option').first()).toBeVisible()
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Enter')
@@ -141,6 +147,46 @@ test('logout — keyboard only', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign out' }).focus()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL('/login')
+})
+
+// AC3 (logical tab order) + AC4 (no focus traps) — verified explicitly on the send
+// funnel's step 2, the AC's named subject. The forward tab sequence must match the
+// visual reading order, Shift+Tab must walk it in reverse, and Tab past the last
+// control must be able to LEAVE the funnel (proving the step is not a focus trap).
+test('tab order and no focus trap — send funnel step 2 (keyboard only)', async ({ page }) => {
+  const suffix = uniqueSuffix()
+  const sender = `e2e_kb_ord_s_${suffix}`
+  const target = `e2e_kb_ord_t_${suffix}`
+
+  await register(page, target)
+  await register(page, sender)
+  await login(page, sender)
+
+  await page.goto('/send')
+  await page.getByRole('combobox', { name: 'Search for a recipient by username' }).focus()
+  await page.keyboard.type(target)
+  await expect(page.getByRole('option').first()).toBeVisible()
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Enter')
+
+  // AC3: forward tab order matches visual reading order
+  await expect(page.getByLabel('Amount (USD)')).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByLabel('Note (optional)')).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Back' })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeFocused()
+
+  // AC3 (reverse): Shift+Tab walks the same sequence backwards
+  await page.keyboard.press('Shift+Tab')
+  await expect(page.getByRole('button', { name: 'Back' })).toBeFocused()
+
+  // AC4: no focus trap — Tab past the last control escapes the funnel form
+  // (focus does NOT wrap back to the amount input).
+  await page.getByRole('button', { name: 'Continue' }).focus()
+  await page.keyboard.press('Tab')
+  await expect(page.getByLabel('Amount (USD)')).not.toBeFocused()
 })
 
 // TODO(4.3/4.4): Add keyboard tests for Pay, Decline, Cancel once those stories ship.

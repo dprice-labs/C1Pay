@@ -45,7 +45,7 @@ export default function SendPage() {
   const isInitialMount = useRef(true)
   const step1SectionRef = useRef<HTMLElement>(null)
   const step2AmountRef = useRef<HTMLInputElement>(null)
-  const step3BackRef = useRef<HTMLDivElement>(null)
+  const step3BackRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -57,7 +57,7 @@ export default function SendPage() {
     } else if (step === 2) {
       step2AmountRef.current?.focus()
     } else if (step === 3) {
-      step3BackRef.current?.querySelector('button')?.focus()
+      step3BackRef.current?.focus()
     }
   }, [step])
 
@@ -249,12 +249,15 @@ export default function SendPage() {
           )}
 
           <div className="flex gap-3">
-            <div ref={step3BackRef}>
-              <Button variant="outline" onClick={handleBackFromStep3} disabled={submitting}>
-                <ArrowLeft data-icon="inline-start" />
-                Back
-              </Button>
-            </div>
+            <Button
+              ref={step3BackRef}
+              variant="outline"
+              onClick={handleBackFromStep3}
+              disabled={submitting}
+            >
+              <ArrowLeft data-icon="inline-start" />
+              Back
+            </Button>
             <Button onClick={handleConfirm} disabled={submitting}>
               {submitting ? 'Sending…' : 'Confirm & Send'}
             </Button>

@@ -4,7 +4,7 @@ baseline_commit: 488e898
 
 # Story 6.2: Keyboard-First Navigation Across Core Flows
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -62,6 +62,17 @@ So that the application is fully operable by keyboard as a first-class, demonstr
 - [x] Task 6: Full suite verification (AC: #1–6)
   - [x] `npm run test:e2e:docker` — 19/19 passed, exit code 0, zero regressions
   - [x] Bonus: fixed broken `.getByRole('button')` locators in `history.spec.ts` and `realtime.spec.ts` (same 6.1 breakage); fixed global-teardown FK constraint; added `workers: 3` CI cap to eliminate flakiness
+
+## Review Findings
+
+_Code review (2026-06-25) — 3 adversarial layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor). 1 decision, 1 patch, 3 deferred, ~10 dismissed as noise. No Critical/High product bugs; implementation faithful to spec (AC1/AC4/AC5 verified against source). On user direction all 5 items (2 patch + 3 deferred) were FIXED and verified — full containerised suite 20/20 green._
+
+- [x] [Review][Patch] Add explicit AC3/AC4 e2e assertions (resolved from decision 2026-06-25) [tests/e2e/keyboard.spec.ts] — Task 5 is labelled `(AC: #1, #2, #3, #6)` and AC#4 requires "no focus traps", but the suite asserted none directly. **Fixed:** added `tab order and no focus trap — send funnel step 2` test (forward + reverse Tab sequence for AC3; Tab-past-last-control-escapes for AC4). AC2 (focus indicator) accepted as covered by the 6.4 axe gate. [blind+edge+auditor]
+- [x] [Review][Patch] Unsuffixed recipient search query selects a non-deterministic user [tests/e2e/keyboard.spec.ts] — send/request tests typed bare `e2e_kb_t_`/`e2e_kb_rt_` prefixes; search is prefix `ilike('term%')` (src/lib/users.ts:47), so with parallel workers + suite-end-only teardown the query matched foreign targets and `results[0]` was non-deterministic. **Fixed:** both tests now type the full suffixed `target` username, scoping the match to this test's own recipient. [blind+edge+auditor]
+- [x] [Review][Fixed] `workers: 3` was a flakiness mitigation, not a root-cause fix [playwright.config.ts] — **Fixed:** CI now serves a production build (`next build && next start`) instead of `next dev`, which handles concurrency properly; the artificial worker cap was removed (full pool restored). Required fixing a pre-existing latent build error (see below). [blind]
+- [x] [Review][Fixed] `Button` ref workaround removed [src/components/ui/button.tsx, send/request page.tsx] — **Fixed:** Base UI `Button` is a `ForwardRefExoticComponent`, so `ref` flows through the wrapper's `{...props}` (same as `Input`). Dropped the wrapper `<div ref>` + `querySelector('button')`; step-3 Back now takes `ref={step3BackRef}` directly (`HTMLButtonElement`) with `step3BackRef.current?.focus()`. [blind+edge+auditor]
+- [x] [Review][Fixed] global-teardown deletes are non-transactional [tests/e2e/global-teardown.ts] — **Fixed:** the three deletes now run inside `sql.begin()` (atomic), with a NOTE comment instructing future stories to add new FK-child cleanup before the users delete. [blind]
+- [x] [Review][Fixed] Pre-existing latent build bug (out of 6.2 scope, surfaced by the W1 prod-build switch) [src/app/api/requests/route.ts] — `log.error('…', err)` passed a 2nd arg to `createLogger().error`, which takes one; `next dev` never type-checked it but `next build` failed. **Fixed:** folded `err` into the message string. Approved by user as a prerequisite for the W1 fix.
 
 ## Dev Notes
 

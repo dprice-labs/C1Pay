@@ -21,7 +21,7 @@ export async function GET() {
     return Response.json(items)
   } catch (err) {
     if (err instanceof AppError) return errorResponse(err.message, err.code, err.status)
-    log.error('unexpected error in GET /api/requests', err)
+    log.error(`unexpected error in GET /api/requests: ${err instanceof Error ? err.message : String(err)}`)
     return errorResponse('Internal server error', 'INTERNAL_ERROR', 500)
   }
 }
