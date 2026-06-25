@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 /Users/vindhyasurampudi/Documents/Workspace/Team/C1Pay/.claude/scripts/save-story-metrics.py"
+            "command": "python3 .claude/scripts/save-story-metrics.py"
           }
         ]
       }
