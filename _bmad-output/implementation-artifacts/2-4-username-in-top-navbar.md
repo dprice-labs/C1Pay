@@ -149,3 +149,18 @@ No regressions — no logic changed, only a render-only addition to the header.
 | Date | Change |
 |------|--------|
 | 2026-06-25 | Added `@username` span to protected layout header (GH #39) |
+
+---
+
+## Session Metrics
+
+### Development
+- Started: 2026-06-25
+- Completed: 2026-06-25
+- Duration: —
+- Tokens (dev): —
+
+### Code Review
+- Completed: —
+- Duration: —
+- Tokens: —
