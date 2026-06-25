@@ -1,8 +1,9 @@
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@/db/index'
 import { users } from '@/db/schema/users'
 import { paymentRequests } from '@/db/schema/requests'
+import { transactions } from '@/db/schema/transactions'
 import { AppError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
 import type { PaymentRequest } from '@/db/schema/requests'
@@ -75,4 +76,120 @@ export async function getInboxRequests(
 
   log.info(`getInboxRequests userId=${userId} → ${rows.length} rows`)
   return rows
+}
+
+/**
+ * Pay a PENDING request. Opens a single atomic transaction: locks both user rows
+ * (ascending id order — same deadlock prevention as sendMoney), debits the payer,
+ * credits the requester, inserts a transactions row, and marks the request PAID.
+ * Caller must be the recipient of the request (not the requester).
+ */
+export async function payRequest(requestId: number, userId: number): Promise<PaymentRequest> {
+  const updated = await db.transaction(async (tx) => {
+    // Lock the request row immediately — prevents concurrent pays from both reading PENDING.
+    const [request] = await tx
+      .select()
+      .from(paymentRequests)
+      .where(eq(paymentRequests.id, requestId))
+      .for('update')
+
+    if (!request) throw new AppError('Request not found', 'REQUEST_NOT_FOUND', 404)
+    // Auth check before status check — unauthorized callers should not learn whether the request is resolved.
+    if (request.recipientId !== userId) {
+      throw new AppError('Forbidden', 'FORBIDDEN', 403)
+    }
+    if (request.status !== 'PENDING') {
+      throw new AppError('Request already resolved', 'REQUEST_ALREADY_RESOLVED', 409)
+    }
+
+    const payerId = userId
+    const requesterId = request.requesterId
+
+    // Lock both rows in ascending id order to prevent deadlock (same pattern as sendMoney).
+    const rows = await tx.execute<{ id: number; balance_cents: number }>(
+      sql`SELECT id, balance_cents FROM users WHERE id IN (${payerId}, ${requesterId}) ORDER BY id FOR UPDATE`
+    )
+
+    const payerRow = rows.find((r) => r.id === payerId)
+    const requesterRow = rows.find((r) => r.id === requesterId)
+
+    if (!payerRow) throw new AppError('Payer not found', 'USER_NOT_FOUND', 404)
+    if (!requesterRow) throw new AppError('Requester not found', 'USER_NOT_FOUND', 404)
+
+    if (payerRow.balance_cents < request.amountCents) {
+      throw new AppError('Insufficient balance', 'INSUFFICIENT_BALANCE', 409)
+    }
+
+    const requesterNewBalance = requesterRow.balance_cents + request.amountCents
+
+    await tx
+      .update(users)
+      .set({ balanceCents: payerRow.balance_cents - request.amountCents })
+      .where(eq(users.id, payerId))
+
+    await tx
+      .update(users)
+      .set({ balanceCents: requesterNewBalance })
+      .where(eq(users.id, requesterId))
+
+    await tx
+      .insert(transactions)
+      .values({
+        senderId: payerId,
+        recipientId: requesterId,
+        amountCents: request.amountCents,
+        note: request.note,
+      })
+
+    const [updatedRequest] = await tx
+      .update(paymentRequests)
+      .set({ status: 'PAID', resolvedAt: sql`NOW()` })
+      .where(eq(paymentRequests.id, requestId))
+      .returning()
+
+    if (!updatedRequest) throw new AppError('Request update failed', 'INTERNAL_ERROR', 500)
+
+    return updatedRequest
+  })
+
+  log.info(`payRequest: requestId=${requestId} payer=${userId} requester=${updated.requesterId} amountCents=${updated.amountCents}`)
+  return updated
+}
+
+/**
+ * Decline a PENDING request. Sets status = DECLINED with resolved_at = now().
+ * No funds move. Caller must be the recipient of the request.
+ * Wrapped in a transaction with FOR UPDATE so a concurrent payRequest cannot
+ * commit between the status check and the status update.
+ */
+export async function declineRequest(requestId: number, userId: number): Promise<PaymentRequest> {
+  const updated = await db.transaction(async (tx) => {
+    const [request] = await tx
+      .select()
+      .from(paymentRequests)
+      .where(eq(paymentRequests.id, requestId))
+      .for('update')
+
+    if (!request) throw new AppError('Request not found', 'REQUEST_NOT_FOUND', 404)
+    // Auth check before status check — unauthorized callers should not learn whether the request is resolved.
+    if (request.recipientId !== userId) {
+      throw new AppError('Forbidden', 'FORBIDDEN', 403)
+    }
+    if (request.status !== 'PENDING') {
+      throw new AppError('Request already resolved', 'REQUEST_ALREADY_RESOLVED', 409)
+    }
+
+    const [updatedRequest] = await tx
+      .update(paymentRequests)
+      .set({ status: 'DECLINED', resolvedAt: sql`NOW()` })
+      .where(and(eq(paymentRequests.id, requestId), eq(paymentRequests.status, 'PENDING')))
+      .returning()
+
+    if (!updatedRequest) throw new AppError('Request update failed', 'INTERNAL_ERROR', 500)
+
+    return updatedRequest
+  })
+
+  log.info(`declineRequest: requestId=${requestId} userId=${userId}`)
+  return updated
 }
