@@ -2,9 +2,10 @@ import { describe, it, expect, afterEach, afterAll } from 'vitest'
 import { db } from '@/db/index'
 import { users } from '@/db/schema/users'
 import { paymentRequests } from '@/db/schema/requests'
+import { transactions } from '@/db/schema/transactions'
 import { eq, or } from 'drizzle-orm'
 import { createUser } from '@/lib/users'
-import { createRequest, getInboxRequests } from '@/lib/requests'
+import { createRequest, getInboxRequests, payRequest, declineRequest } from '@/lib/requests'
 
 const REQUESTER_USERNAME = '__req_test_requester__'
 const RECIPIENT_USERNAME = '__req_test_recipient__'
@@ -15,13 +16,18 @@ afterAll(async () => {
 })
 
 afterEach(async () => {
-  // Must delete requests before users due to FK constraints
+  // Must delete in FK-safe order: transactions → payment_requests → users
   const testUsers = await db
     .select({ id: users.id })
     .from(users)
     .where(or(eq(users.username, REQUESTER_USERNAME), eq(users.username, RECIPIENT_USERNAME)))
 
   for (const u of testUsers) {
+    await db
+      .delete(transactions)
+      .where(
+        or(eq(transactions.senderId, u.id), eq(transactions.recipientId, u.id)),
+      )
     await db
       .delete(paymentRequests)
       .where(
@@ -163,5 +169,118 @@ describe('getInboxRequests integration', () => {
     const items = await getInboxRequests(recipient.id)
 
     expect(items).toHaveLength(0)
+  })
+})
+
+describe('payRequest integration', () => {
+  it('debits payer, credits requester, inserts transactions row, and sets status PAID', async () => {
+    // requester requests 5000 from recipient; recipient pays
+    const requester = await createUser(REQUESTER_USERNAME, 'pass') // balance = 100000
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass') // balance = 100000
+    const req = await createRequest(requester.id, recipient.id, 5000, 'coffee')
+
+    const result = await payRequest(req.id, recipient.id)
+
+    // Request is now PAID with resolvedAt set
+    expect(result.status).toBe('PAID')
+    expect(result.resolvedAt).toBeInstanceOf(Date)
+
+    // Balances updated atomically
+    const [updatedRecipient] = await db.select().from(users).where(eq(users.id, recipient.id))
+    const [updatedRequester] = await db.select().from(users).where(eq(users.id, requester.id))
+    expect(updatedRecipient!.balanceCents).toBe(100000 - 5000) // payer debited
+    expect(updatedRequester!.balanceCents).toBe(100000 + 5000) // requester credited
+
+    // transactions row inserted
+    const txRows = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.senderId, recipient.id))
+    expect(txRows).toHaveLength(1)
+    expect(txRows[0]).toMatchObject({
+      senderId: recipient.id,
+      recipientId: requester.id,
+      amountCents: 5000,
+      note: 'coffee',
+    })
+
+    // Request removed from active inbox
+    const inbox = await getInboxRequests(recipient.id)
+    expect(inbox).toHaveLength(0)
+  })
+
+  it('throws INSUFFICIENT_BALANCE when payer has no balance — no changes persisted', async () => {
+    // Give recipient 0 balance by using a fresh createUser and then zeroing balance
+    const requester = await createUser(REQUESTER_USERNAME, 'pass') // balance = 100000
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass') // balance = 100000
+    // Zero out recipient balance
+    await db.update(users).set({ balanceCents: 0 }).where(eq(users.id, recipient.id))
+
+    const req = await createRequest(requester.id, recipient.id, 5000)
+
+    await expect(payRequest(req.id, recipient.id)).rejects.toMatchObject({
+      code: 'INSUFFICIENT_BALANCE',
+    })
+
+    // Balances unchanged
+    const [updatedRecipient] = await db.select().from(users).where(eq(users.id, recipient.id))
+    const [updatedRequester] = await db.select().from(users).where(eq(users.id, requester.id))
+    expect(updatedRecipient!.balanceCents).toBe(0)
+    expect(updatedRequester!.balanceCents).toBe(100000)
+
+    // No transactions row inserted
+    const txRows = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.senderId, recipient.id))
+    expect(txRows).toHaveLength(0)
+
+    // Request still PENDING
+    const [req2] = await db.select().from(paymentRequests).where(eq(paymentRequests.id, req.id))
+    expect(req2!.status).toBe('PENDING')
+  })
+
+  it('throws REQUEST_ALREADY_RESOLVED when request is already PAID', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+    const req = await createRequest(requester.id, recipient.id, 1000)
+
+    // Pay once
+    await payRequest(req.id, recipient.id)
+
+    // Attempt to pay again
+    await expect(payRequest(req.id, recipient.id)).rejects.toMatchObject({
+      code: 'REQUEST_ALREADY_RESOLVED',
+    })
+  })
+})
+
+describe('declineRequest integration', () => {
+  it('sets status DECLINED with resolvedAt and no balance changes', async () => {
+    const requester = await createUser(REQUESTER_USERNAME, 'pass')
+    const recipient = await createUser(RECIPIENT_USERNAME, 'pass')
+    const req = await createRequest(requester.id, recipient.id, 3000)
+
+    const result = await declineRequest(req.id, recipient.id)
+
+    expect(result.status).toBe('DECLINED')
+    expect(result.resolvedAt).toBeInstanceOf(Date)
+
+    // Balances unchanged — no funds moved
+    const [updatedRecipient] = await db.select().from(users).where(eq(users.id, recipient.id))
+    const [updatedRequester] = await db.select().from(users).where(eq(users.id, requester.id))
+    expect(updatedRecipient!.balanceCents).toBe(100000)
+    expect(updatedRequester!.balanceCents).toBe(100000)
+
+    // No transactions row inserted
+    const txRows = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.senderId, recipient.id))
+    expect(txRows).toHaveLength(0)
+
+    // Request removed from active inbox
+    const inbox = await getInboxRequests(recipient.id)
+    expect(inbox).toHaveLength(0)
   })
 })

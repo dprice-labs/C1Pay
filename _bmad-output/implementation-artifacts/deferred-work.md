@@ -128,6 +128,13 @@
 - **SSE `pendingCount` stale on reconnect** (`src/hooks/use-sse.ts`): no server-authoritative count re-sync when SSE reconnects; count can drift stale-low. Pre-existing SSE behavior from story 2.3; deferred to story 4.5 reconciliation.
 - **`RequestCard` hardcodes "PENDING" string**: component only receives PENDING items by contract; hardcoding is by design. Revisit if the component is reused for non-PENDING states in future stories.
 
+## Deferred from: code review of 4-3-pay-and-decline-a-request (2026-06-25)
+
+- **Stale Zustand `balanceCents` in `canPay` gate and error message** (`src/app/(protected)/inbox/RequestCard.tsx`): `canPay` is computed from the Zustand store which updates via SSE; if the balance drops between SSE events the Pay button can appear enabled and the INSUFFICIENT_BALANCE error message can display a stale balance figure. Server enforces the real guard. Resolve when Story 4.5 adds `REQUEST_RESOLVED` SSE events that will naturally prompt a balance re-sync.
+- **No `REQUEST_RESOLVED` SSE emitted on pay/decline** (`src/lib/requests.ts`): the SSE event type exists in types but is never emitted by `payRequest` or `declineRequest`; home-page inbox badge count does not update after a resolution until the user reloads. Explicitly deferred to Story 4.5 scope.
+- **Self-payment guard missing in `payRequest`** (`src/lib/requests.ts`): if `recipientId === requesterId` (requires upstream data corruption — `createRequest` guards this with `SELF_REQUEST`), the two sequential UPDATE calls use a pre-transaction balance snapshot and net-increase the user's balance by `amountCents`. Not reachable without a FK-level data integrity violation upstream; defensive guard could be added if attack-surface hardening is required.
+- **`declineRequest` integration test coverage gap** (`tests/integration/requests.test.ts`): only the happy path is tested at the integration level; FORBIDDEN and double-decline (REQUEST_ALREADY_RESOLVED) paths are covered by unit tests only. Not an AC11 requirement; add during a test-hardening pass.
+
 ## Deferred from: code review of 6-1-semantic-structure-aria-and-contrast-baseline (2026-06-24) — ALL RESOLVED in same session
 
 - ~~**h1 loses `data-slot="card-title"`**~~ — **RESOLVED (2026-06-24):** auth headings changed from `CardTitle` to raw `<h1>` at the use-site per spec; `CardTitle` component itself unchanged.
