@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: c1pay
+  namespace: c1pay
+  labels:
+    app.kubernetes.io/name: c1pay
+spec:
+  # ── Scale to >1 only after solving the SSE in-memory emitter issue.
+  #    Options: sticky sessions (nginx cookie affinity) or Redis pub/sub backend.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: c1pay
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: c1pay
+    spec:
+      containers:
+        - name: c1pay
+          image: c1pay:latest              # overwrite via ArgoCD sync wave or ImageSet
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - secretRef:
+                name: c1pay-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 500m, memory: 512Mi }

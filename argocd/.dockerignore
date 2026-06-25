@@ -1,0 +1,38 @@
+# ── Git ───────────────────────────────────────────
+.git
+.gitignore
+.github
+
+# ── Docs / planning (not needed in production) ──
+*.md
+_bmad-output/
+_docs/
+_planning/
+
+# ── Dev tooling ─────────────────────────────────
+.vscode/
+.idea/
+.env*
+!.env.example
+
+# ── Test infra ───────────────────────────────────
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# ── Docker / K8s (avoid infinite build loops) ───
+docker-compose*.yml
+Dockerfile*
+argocd/
+
+# ── Node ─────────────────────────────────────────
+node_modules
+.next
+out
+dist
+*.log
+
+# ── OS ───────────────────────────────────────────
+.DS_Store
+Thumbs.db

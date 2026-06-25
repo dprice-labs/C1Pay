@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: c1pay-ingress
+  namespace: c1pay
+  annotations:
+    # ── Adjust for your ingress controller (nginx, cert-manager, cloud provider, etc.)
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  # tls:                          # uncomment and fill in when you have a certificate
+  #   - secretName: c1pay-tls
+  #     hosts:
+  #       - c1pay.example.com
+  rules:
+    - host: c1pay.example.com   # ── replace with your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: c1pay
+                port:
+                  number: 80
