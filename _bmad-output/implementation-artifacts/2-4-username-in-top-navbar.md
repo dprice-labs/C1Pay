@@ -114,3 +114,38 @@ No unit or integration tests are required for this story — it is a pure server
 - Clicking the username (profile link) — not requested.
 - Avatar / initials icon — not requested.
 - Truncation for long usernames — usernames are constrained by registration validation; not a real-world concern for this app.
+
+---
+
+## Dev Agent Record
+
+### Implementation Notes
+
+- Modified `src/app/(protected)/layout.tsx` only — wrapped the existing `<LogoutButton />` in a `<div className="flex items-center gap-3">` and prepended a `<span>` rendering `@{user.username}`.
+- `user.username` was already in scope from the existing `getUserById(userId)` call — zero additional DB queries.
+- `aria-label="Signed in as {username}"` added so screen readers announce the full phrase rather than the bare `@handle`.
+- Semantic token `text-muted-foreground` used — satisfies WCAG AA contrast without raw colour values.
+
+### Completion Notes
+
+All 6 acceptance criteria satisfied:
+- AC1 ✅ Username visible in header on every protected page (server-rendered by `ProtectedLayout`)
+- AC2 ✅ Unauthenticated pages (`/login`, `/register`) use a separate layout with no header — unchanged
+- AC3 ✅ Username prefixed with `@`
+- AC4 ✅ No breakpoint hiding — visible on mobile
+- AC5 ✅ `text-muted-foreground` semantic token meets WCAG AA contrast
+- AC6 ✅ `<span>` is not `aria-hidden`; `aria-label` provides full context for screen readers
+
+No regressions — no logic changed, only a render-only addition to the header.
+
+### File List
+
+| File | Status |
+|------|--------|
+| `src/app/(protected)/layout.tsx` | Modified |
+
+### Change Log
+
+| Date | Change |
+|------|--------|
+| 2026-06-25 | Added `@username` span to protected layout header (GH #39) |
