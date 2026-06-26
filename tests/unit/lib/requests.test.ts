@@ -10,7 +10,7 @@ vi.mock('@/db/index', () => ({
   },
 }))
 
-import { createRequest, payRequest, declineRequest } from '@/lib/requests'
+import { createRequest, payRequest, declineRequest, cancelRequest } from '@/lib/requests'
 import { db } from '@/db/index'
 
 // The `tx` object passed into a db.transaction(callback) — minimal shape for unit stubs.
@@ -259,6 +259,66 @@ describe('declineRequest guards', () => {
     )
 
     await declineRequest(1, 99).catch(() => {})
+    expect(mockTxUpdate).not.toHaveBeenCalled()
+  })
+})
+
+// ─── cancelRequest guards ────────────────────────────────────────────────────
+
+describe('cancelRequest guards', () => {
+  it('throws REQUEST_ALREADY_RESOLVED when request status is PAID', async () => {
+    const { mockTxSelect } = buildTxWithRequest({ ...fakeRequest, status: 'PAID' })
+    vi.mocked(db.transaction).mockImplementationOnce((fn) =>
+      fn({ select: mockTxSelect } as unknown as TxArg)
+    )
+
+    await expect(cancelRequest(1, 1)).rejects.toMatchObject({
+      code: 'REQUEST_ALREADY_RESOLVED',
+    })
+  })
+
+  it('throws REQUEST_ALREADY_RESOLVED when request status is DECLINED', async () => {
+    const { mockTxSelect } = buildTxWithRequest({ ...fakeRequest, status: 'DECLINED' })
+    vi.mocked(db.transaction).mockImplementationOnce((fn) =>
+      fn({ select: mockTxSelect } as unknown as TxArg)
+    )
+
+    await expect(cancelRequest(1, 1)).rejects.toMatchObject({
+      code: 'REQUEST_ALREADY_RESOLVED',
+    })
+  })
+
+  it('throws REQUEST_ALREADY_RESOLVED when request status is CANCELLED', async () => {
+    const { mockTxSelect } = buildTxWithRequest({ ...fakeRequest, status: 'CANCELLED' })
+    vi.mocked(db.transaction).mockImplementationOnce((fn) =>
+      fn({ select: mockTxSelect } as unknown as TxArg)
+    )
+
+    await expect(cancelRequest(1, 1)).rejects.toMatchObject({
+      code: 'REQUEST_ALREADY_RESOLVED',
+    })
+  })
+
+  it('throws FORBIDDEN when caller is not the requester', async () => {
+    // fakeRequest.requesterId = 1; calling userId = 99 → forbidden
+    const { mockTxSelect } = buildTxWithRequest(fakeRequest)
+    vi.mocked(db.transaction).mockImplementationOnce((fn) =>
+      fn({ select: mockTxSelect } as unknown as TxArg)
+    )
+
+    await expect(cancelRequest(1, 99)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    })
+  })
+
+  it('does not call tx.update when FORBIDDEN guard fires', async () => {
+    const { mockTxSelect } = buildTxWithRequest(fakeRequest)
+    const mockTxUpdate = vi.fn()
+    vi.mocked(db.transaction).mockImplementationOnce((fn) =>
+      fn({ select: mockTxSelect, update: mockTxUpdate } as unknown as TxArg)
+    )
+
+    await cancelRequest(1, 99).catch(() => {})
     expect(mockTxUpdate).not.toHaveBeenCalled()
   })
 })

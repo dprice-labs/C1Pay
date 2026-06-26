@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-25  # story 4.3 → done; story 2.4 created (GH #39)
+last_updated: 2026-06-25  # story 4.3 → done; story 2.4 created (GH #39); story 4.4 → review
 project: C1Pay
 
 
@@ -75,7 +75,7 @@ development_status:
   4-1-requests-schema-and-create-request: done
   4-2-inbox-and-pending-request-display: done
   4-3-pay-and-decline-a-request: done
-  4-4-cancel-an-outgoing-request: backlog
+  4-4-cancel-an-outgoing-request: review
   4-5-real-time-inbox-and-resolution-updates: backlog
   epic-4-retrospective: optional
 
