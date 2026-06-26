@@ -76,3 +76,89 @@ test('recipient balance updates live when money is sent', async ({ browser }) =>
     await ctxB.close()
   }
 })
+
+test('request → pay updates inbox badge and balance live', async ({ browser }) => {
+  // Random suffix: tests/e2e runs fullyParallel — avoid collisions across workers.
+  const suffix = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`
+  const sender = `e2e_rqt_sender_${suffix}`
+  const recipient = `e2e_rqt_recipient_${suffix}`
+
+  const ctxA = await browser.newContext()
+  const ctxB = await browser.newContext()
+  const pageA = await ctxA.newPage()
+  const pageB = await ctxB.newPage()
+
+  try {
+    // --- Register + login both users ---
+    await register(pageA, sender)
+    await register(pageB, recipient)
+    await login(pageA, sender)
+    await login(pageB, recipient)
+
+    // Both start at $1,000.00 on home page.
+    await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
+    await expect(pageB.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
+
+    // --- A navigates to /request and creates a request via the 3-step UI ---
+    await pageA.goto('/request')
+    await expect(pageA.getByRole('heading', { name: 'Step 1 of 3' })).toBeVisible()
+
+    // Step 1: select recipient
+    await pageA.getByLabel('Search for a recipient by username').fill(recipient)
+    await expect(pageA.getByRole('option').filter({ hasText: recipient })).toBeVisible()
+    await pageA.getByRole('option').filter({ hasText: recipient }).click()
+
+    // Step 2: enter amount (10 USD = 1000 cents)
+    await expect(pageA.getByRole('heading', { name: 'Step 2 of 3' })).toBeVisible()
+    await pageA.getByLabel('Amount (USD)').fill('10')
+    await pageA.getByLabel('Note (optional)').fill('lunch')
+    await pageA.getByRole('button', { name: 'Continue' }).click()
+
+    // Step 3: confirm
+    await expect(pageA.getByRole('heading', { name: 'Step 3 of 3' })).toBeVisible()
+    await expect(pageA.getByText(sender)).toBeVisible() // shows sender username on confirmation card
+    await expect(pageA.getByText('$10.00')).toBeVisible()
+    await expect(pageA.getByText('lunch')).toBeVisible()
+    await pageA.getByRole('button', { name: 'Confirm & Request' }).click()
+    await expect(pageA).toHaveURL('/')
+
+    // A's balance is unchanged — no funds move until the recipient pays.
+    await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
+
+    // --- Set up B's SSE guard BEFORE events can fire ---
+    // The in-memory emitter has no replay; an event emitted before B registers would be lost.
+    // waitForResponse on /api/sse proves the stream connection is established server-side.
+    const bSseRegistered = pageB.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/sse',
+      { timeout: 15_000 },
+    )
+    await pageB.goto('/inbox')
+    await bSseRegistered
+
+    // B's balance is unchanged at $1,000.00 — pending request received but not yet paid.
+    await expect(pageB.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
+
+    // AC #2: B's inbox badge increments live when REQUEST_RECEIVED arrives.
+    await expect(pageB.getByLabel(/pending/)).toContainText('1')
+
+    // --- B navigates to /inbox and pays the request ---
+    await expect(pageB.getByRole('heading', { name: 'Inbox' })).toBeVisible()
+    await expect(pageB.getByText(sender)).toBeVisible() // sender's username appears as requester in card
+
+    // Click Pay on the request card — RequestCard has a Pay button per item.
+    const payBtn = pageB.getByRole('button', { name: 'Pay' }).first()
+    await expect(payBtn).toBeEnabled()
+    await payBtn.click()
+    await expect(pageB).toHaveURL('/')
+
+    // --- AC #4: A receives REQUEST_RESOLVED + BALANCE_UPDATED live ---
+    // Sender's balance drops from $1,000.00 to $990.00 (the requested amount).
+    await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$990\.00/)
+
+    // B's inbox badge decrements (REQUEST_RESOLVED fired — request is no longer pending).
+    await expect(pageB.getByLabel(/pending/)).toContainText('0')
+  } finally {
+    await ctxA.close()
+    await ctxB.close()
+  }
+})

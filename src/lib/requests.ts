@@ -6,6 +6,7 @@ import { paymentRequests } from '@/db/schema/requests'
 import { transactions } from '@/db/schema/transactions'
 import { AppError } from '@/lib/errors'
 import { createLogger } from '@/lib/logger'
+import { emit } from '@/lib/sse-emitter'
 import type { PaymentRequest } from '@/db/schema/requests'
 
 const log = createLogger('requests')
@@ -62,6 +63,23 @@ export async function createRequest(
   if (!inserted) throw new AppError('Request insert failed', 'INTERNAL_ERROR', 500)
 
   log.info(`createRequest: requester=${requesterId} → recipient=${recipientId} amountCents=${amountCents}`)
+
+  // Emit REQUEST_RECEIVED to the recipient so their inbox badge updates live (AC#1, AC#2).
+  // Fire-and-forget — a failed emit must not affect the committed request.
+  void db
+    .select({ username: users.username })
+    .from(users)
+    .where(eq(users.id, requesterId))
+    .then(([row]) => {
+      if (row?.username) {
+        void emit(recipientId, {
+          type: 'REQUEST_RECEIVED',
+          data: { requestId: inserted.id, fromUsername: row.username, amountCents: inserted.amountCents, note: inserted.note ?? undefined },
+        }).catch(() => {})
+      }
+    })
+    .catch(() => {})
+
   return inserted
 }
 
@@ -194,11 +212,23 @@ export async function payRequest(requestId: number, userId: number): Promise<Pay
 
     if (!updatedRequest) throw new AppError('Request update failed', 'INTERNAL_ERROR', 500)
 
-    return updatedRequest
+    return { updatedRequest, requesterNewBalance }
   })
 
-  log.info(`payRequest: requestId=${requestId} payer=${userId} requester=${updated.requesterId} amountCents=${updated.amountCents}`)
-  return updated
+  const requesterNewBalance = updated.requesterNewBalance
+  const req = updated.updatedRequest
+  const requesterId = req.requesterId
+
+  log.info(`payRequest: requestId=${requestId} payer=${userId} requester=${requesterId} amountCents=${req.amountCents}`)
+
+  // Emit to the requester (original request creator) — they receive funds + inbox update.
+  void emit(requesterId, { type: 'BALANCE_UPDATED', data: { balance: requesterNewBalance } }).catch(() => {})
+  void emit(requesterId, {
+    type: 'REQUEST_RESOLVED',
+    data: { requestId: req.id, status: 'PAID' as const },
+  }).catch(() => {})
+
+  return updated.updatedRequest
 }
 
 /**
@@ -248,7 +278,15 @@ async function resolveRequestGuarded(
  */
 export async function declineRequest(requestId: number, userId: number): Promise<PaymentRequest> {
   const updated = await resolveRequestGuarded(requestId, userId, 'recipientId', 'DECLINED')
+
   log.info(`declineRequest: requestId=${requestId} userId=${userId}`)
+
+  // Emit REQUEST_RESOLVED to the requester — their request was declined (AC#3).
+  void emit(updated.requesterId, {
+    type: 'REQUEST_RESOLVED',
+    data: { requestId: updated.id, status: 'DECLINED' as const },
+  }).catch(() => {})
+
   return updated
 }
 
@@ -258,6 +296,14 @@ export async function declineRequest(requestId: number, userId: number): Promise
  */
 export async function cancelRequest(requestId: number, userId: number): Promise<PaymentRequest> {
   const updated = await resolveRequestGuarded(requestId, userId, 'requesterId', 'CANCELLED')
+
   log.info(`cancelRequest: requestId=${requestId} userId=${userId}`)
+
+  // Emit REQUEST_RESOLVED to the recipient — their pending request was cancelled (AC#3).
+  void emit(updated.recipientId, {
+    type: 'REQUEST_RESOLVED',
+    data: { requestId: updated.id, status: 'CANCELLED' as const },
+  }).catch(() => {})
+
   return updated
 }
