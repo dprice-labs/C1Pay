@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Send, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { AmountDisplay } from '@/components/ui/AmountDisplay'
@@ -13,6 +13,7 @@ export function OutgoingRequestCard({ item }: { item: OutgoingRequestItem }) {
   const router = useRouter()
   const [isCancelling, setIsCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   async function handleCancel() {
     setError(null)
@@ -32,6 +33,17 @@ export function OutgoingRequestCard({ item }: { item: OutgoingRequestItem }) {
         return
       }
 
+      // Move focus to the section heading BEFORE router.refresh() unmounts this card.
+      // Without this, the focused button is removed from the DOM and focus falls to <body>
+      // — a WCAG 2.4.3 Focus Order violation (story 6.5, AC#2).
+      const section = containerRef.current?.closest('section')
+      const heading = section?.querySelector<HTMLElement>('h1, h2')
+      if (heading) {
+        heading.setAttribute('tabindex', '-1')
+        heading.focus()
+        heading.addEventListener('blur', () => heading.removeAttribute('tabindex'), { once: true })
+      }
+
       // Leave isCancelling true (button stays disabled) — router.refresh() is about to
       // remove this card from the list once the server data re-fetches. Resetting it here
       // would re-enable the button for the brief window before that happens, letting a
@@ -44,7 +56,7 @@ export function OutgoingRequestCard({ item }: { item: OutgoingRequestItem }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-card-foreground">
+    <div ref={containerRef} className="flex flex-col gap-3 rounded-lg border bg-card p-3 text-card-foreground">
       <div className="flex items-center justify-between gap-4">
         {/* min-w-0 on the identity column + its inner stack so `truncate` actually clips a long
             recipient username (flex children default to min-width:auto and won't shrink otherwise). */}

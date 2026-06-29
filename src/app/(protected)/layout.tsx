@@ -5,6 +5,7 @@ import { getInboxRequests } from '@/lib/requests'
 import LogoutButton from './LogoutButton'
 import Providers from './Providers'
 import { NavLinks } from './NavLinks'
+import { PendingCountAnnouncer } from './PendingCountAnnouncer'
 
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await getAuthUser()
@@ -13,6 +14,10 @@ export default async function ProtectedLayout({ children }: { children: React.Re
 
   return (
     <Providers initialBalance={user.balanceCents} initialPendingCount={initialPendingCount}>
+      {/* aria-live pending-count region: lives in the layout (not the home page) so SSE-driven
+          REQUEST_RECEIVED / REQUEST_RESOLVED updates are announced on every protected route,
+          not only when the user is on /. Required by FR31 / 6.1 AC / UX-DR11 (story 6.5, AC#5). */}
+      <PendingCountAnnouncer />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-sm focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:outline-2 focus:outline-ring"
@@ -23,7 +28,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
         <Link href="/" className="font-semibold hover:text-foreground/80">C1Pay</Link>
         <NavLinks />
         <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground" aria-label={`Signed in as ${user.username}`}>
+          <span className="hidden sm:inline text-sm text-muted-foreground" aria-label={`Signed in as ${user.username}`}>
             @{user.username}
           </span>
           <LogoutButton />

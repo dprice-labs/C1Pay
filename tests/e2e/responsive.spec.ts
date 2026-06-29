@@ -98,6 +98,57 @@ for (const [name, viewport] of Object.entries(VIEWPORTS)) {
   })
 }
 
+// AC#3 (story 6.5): /inbox with incoming (Pay/Decline) AND outgoing (Cancel) rows does not
+// scroll horizontally at mobile, even with long requester/recipient usernames. The action-button
+// row adds width over the identity row; mirror the 6.3 min-w-0/truncate/shrink-0 pattern.
+test.describe('mobile (375px) — inbox actions + outgoing section overflow', () => {
+  test.use({ viewport: VIEWPORTS.mobile })
+
+  test('/inbox with incoming + outgoing rows does not scroll horizontally', async ({ page }) => {
+    const suffix = uniqueSuffix()
+    // Long username: guards the identity column of both RequestCard and OutgoingRequestCard
+    const longName = `e2e_rsp_supercalifragilisticexpialidocious_${suffix}`
+    const viewer = `e2e_rsp_inb_${suffix}`
+
+    await register(page, longName)
+    await register(page, viewer)
+
+    // longName → viewer (viewer sees it as incoming; Pay/Decline rendered with longName in identity col)
+    await login(page, longName)
+    await page.goto('/request')
+    await page
+      .getByRole('combobox', { name: 'Search for a recipient by username' })
+      .fill(viewer)
+    await expect(page.getByRole('option').filter({ hasText: viewer })).toBeVisible()
+    await page.getByRole('option').filter({ hasText: viewer }).click()
+    await page.getByLabel('Amount (USD)').fill('123.45')
+    await page.getByLabel('Note (optional)').fill(LONG_NOTE)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Confirm & Request' }).click()
+    await expect(page).toHaveURL('/')
+
+    // viewer → longName (viewer sees it as outgoing; Cancel rendered with longName in identity col)
+    await login(page, viewer)
+    await page.goto('/request')
+    await page
+      .getByRole('combobox', { name: 'Search for a recipient by username' })
+      .fill(longName)
+    await expect(page.getByRole('option').filter({ hasText: longName })).toBeVisible()
+    await page.getByRole('option').filter({ hasText: longName }).click()
+    await page.getByLabel('Amount (USD)').fill('67.89')
+    await page.getByLabel('Note (optional)').fill(LONG_NOTE)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByRole('button', { name: 'Confirm & Request' }).click()
+    await expect(page).toHaveURL('/')
+
+    // Navigate to inbox — both sections are populated
+    await page.goto('/inbox')
+    await expect(page.getByRole('button', { name: 'Pay' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible()
+    await expectNoHorizontalScroll(page)
+  })
+})
+
 // Mobile-only: the long-content list rows (history, inbox) are the Task 4 overflow surfaces.
 // We build a real long-username row inline so the guard is deterministic under parallel workers.
 test.describe('mobile (375px) — long-content list overflow', () => {

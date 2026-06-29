@@ -189,5 +189,113 @@ test('tab order and no focus trap — send funnel step 2 (keyboard only)', async
   await expect(page.getByLabel('Amount (USD)')).not.toBeFocused()
 })
 
-// TODO(4.3/4.4): Add keyboard tests for Pay, Decline, Cancel once those stories ship.
-//   Flows live on /inbox; buttons will be inside RequestCard components.
+// AC#2 (story 6.5): Epic 4 resolve actions are keyboard-operable with correct focus management.
+// When a resolved card unmounts (router.refresh() removes it from DOM), focus must land on the
+// section heading, not fall to <body> (WCAG 2.4.3 / 2.4.7 failure).
+
+test('pay request — keyboard only + focus on Inbox heading after resolve', async ({ page }) => {
+  const suffix = uniqueSuffix()
+  const payer = `e2e_kb_pay_${suffix}`
+  const requester = `e2e_kb_rq_${suffix}`
+
+  await register(page, requester)
+  await register(page, payer)
+
+  // requester → payer (so payer has an incoming pending request)
+  await login(page, requester)
+  await page.goto('/request')
+  await expect(page.getByText('Step 1 of 3')).toBeVisible()
+  await page.getByRole('combobox', { name: 'Search for a recipient by username' }).fill(payer)
+  await expect(page.getByRole('option').filter({ hasText: payer })).toBeVisible()
+  await page.getByRole('option').filter({ hasText: payer }).click()
+  await page.getByLabel('Amount (USD)').fill('5')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByRole('button', { name: 'Confirm & Request' }).click()
+  await expect(page).toHaveURL('/')
+
+  await login(page, payer)
+  await page.goto('/inbox')
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Pay' })).toBeVisible()
+
+  // Keyboard: focus Pay button and activate with Enter
+  await page.getByRole('button', { name: 'Pay' }).focus()
+  await expect(page.getByRole('button', { name: 'Pay' })).toBeFocused()
+  await page.keyboard.press('Enter')
+
+  // Card leaves the pending list after router.refresh()
+  await expect(page.getByRole('button', { name: 'Pay' })).not.toBeVisible({ timeout: 8_000 })
+
+  // Focus must be on the Inbox heading, not lost to <body> (WCAG 2.4.3)
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeFocused()
+})
+
+test('decline request — keyboard only + focus on Inbox heading after resolve', async ({ page }) => {
+  const suffix = uniqueSuffix()
+  const decliner = `e2e_kb_dec_${suffix}`
+  const requester = `e2e_kb_decrq_${suffix}`
+
+  await register(page, requester)
+  await register(page, decliner)
+
+  await login(page, requester)
+  await page.goto('/request')
+  await expect(page.getByText('Step 1 of 3')).toBeVisible()
+  await page.getByRole('combobox', { name: 'Search for a recipient by username' }).fill(decliner)
+  await expect(page.getByRole('option').filter({ hasText: decliner })).toBeVisible()
+  await page.getByRole('option').filter({ hasText: decliner }).click()
+  await page.getByLabel('Amount (USD)').fill('5')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByRole('button', { name: 'Confirm & Request' }).click()
+  await expect(page).toHaveURL('/')
+
+  await login(page, decliner)
+  await page.goto('/inbox')
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Decline' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Decline' }).focus()
+  await expect(page.getByRole('button', { name: 'Decline' })).toBeFocused()
+  await page.keyboard.press('Enter')
+
+  await expect(page.getByRole('button', { name: 'Decline' })).not.toBeVisible({ timeout: 8_000 })
+
+  // Focus must be on the Inbox heading, not lost to <body>
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeFocused()
+})
+
+test('cancel outgoing request — keyboard only + focus on Outgoing requests heading after resolve', async ({
+  page,
+}) => {
+  const suffix = uniqueSuffix()
+  const canceller = `e2e_kb_can_${suffix}`
+  const target = `e2e_kb_cant_${suffix}`
+
+  await register(page, target)
+  await register(page, canceller)
+
+  // canceller sends a request TO target (canceller sees it as outgoing)
+  await login(page, canceller)
+  await page.goto('/request')
+  await expect(page.getByText('Step 1 of 3')).toBeVisible()
+  await page.getByRole('combobox', { name: 'Search for a recipient by username' }).fill(target)
+  await expect(page.getByRole('option').filter({ hasText: target })).toBeVisible()
+  await page.getByRole('option').filter({ hasText: target }).click()
+  await page.getByLabel('Amount (USD)').fill('5')
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByRole('button', { name: 'Confirm & Request' }).click()
+  await expect(page).toHaveURL('/')
+
+  await page.goto('/inbox')
+  await expect(page.getByRole('heading', { name: 'Outgoing requests', level: 2 })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Cancel' }).focus()
+  await expect(page.getByRole('button', { name: 'Cancel' })).toBeFocused()
+  await page.keyboard.press('Enter')
+
+  await expect(page.getByRole('button', { name: 'Cancel' })).not.toBeVisible({ timeout: 8_000 })
+
+  // Focus must be on the Outgoing requests heading, not lost to <body>
+  await expect(page.getByRole('heading', { name: 'Outgoing requests', level: 2 })).toBeFocused()
+})
