@@ -201,6 +201,10 @@ The application meets WCAG AA at all viewport sizes and is fully keyboard operab
 Every architectural decision and practice demonstrated in the codebase is documented with decision records and concept docs — the codebase becomes a complete self-teaching artifact.
 **FRs covered:** FR41, FR42, FR43, FR44
 
+### Epic 8: Accessibility Testing Restructure
+Accessibility coverage lives next to the feature it tests; CI enforces the axe gate on every pull request; the dev-story template makes omitting accessibility verification a visible process failure from the first commit.
+**NFRs reinforced:** NFR13, NFR14; **FR40 intent:** test organisation is self-explanatory without additional explanation
+
 ---
 
 ## Epic 1: Foundation & Authentication
@@ -860,5 +864,74 @@ So that I can understand the practice in context and follow it to an authoritati
 **Given** any concept doc, **Then** it links to at least one authoritative external resource on the practice (FR44)
 
 **Given** the `docs/concepts/index.md`, **When** read, **Then** every concept doc is linked and each entry resolves to a doc that contains at least one external authoritative link
+
+---
+
+## Epic 8: Accessibility Testing Restructure
+
+**Goal:** Accessibility coverage lives next to the feature it tests; CI enforces the axe gate on every pull request; and the BMad dev-story template makes omitting accessibility verification a visible process failure from the first commit.
+
+**Background:** Epics 1–6 built dimension-based spec files (`accessibility.spec.ts`, `keyboard.spec.ts`, `responsive.spec.ts`) that separated accessibility verification from feature development. Epic 4 exposed the structural gap: three stories went green through the Docker gate while Pay/Decline/Cancel buttons, the NSF alert, and the lifecycle indicator were never axe-scanned. Story 6.5 was the cleanup. This epic closes the gap permanently.
+
+**NFRs reinforced:** NFR13 (zero automated violations), NFR14 (all interactive elements keyboard-operable)
+**FR40 intent:** Tests named and organised so the testing strategy is legible without additional explanation
+
+---
+
+### Story 8.1: Migrate Accessibility Coverage into Feature Spec Files
+
+As a developer reading the test suite,
+I want every feature spec to own its axe, keyboard, and responsive coverage,
+So that accessibility tests are co-located with the features they verify and the suite's organisation is self-explanatory.
+
+**Acceptance Criteria:**
+
+**Given** `accessibility.spec.ts`, `keyboard.spec.ts`, and `responsive.spec.ts`, **When** this story is complete, **Then** all three files are deleted — every test has been re-homed in a feature spec; the total test count is unchanged
+
+**Given** the migration mapping — (a) login/register axe scans → `auth.spec.ts`; (b) `/send` axe scans, keyboard send flow, and mobile overflow → `send-money.spec.ts`; (c) all inbox tests (axe empty + populated, NSF alert, badge text, keyboard pay/decline/cancel, focus-after-resolve, mobile overflow) → `inbox.spec.ts`; (d) `aria-live` structural assertion and two-client live-update tests → `realtime.spec.ts`; (e) `/history` axe scan → `history.spec.ts`; (f) `/request` axe scan and keyboard request flow → `request.spec.ts` — **Then** every migrated test lands in the spec that owns that feature's routes and states
+
+**Given** `inbox.spec.ts` and `request.spec.ts` do not yet exist, **Then** they are created as part of this story, following the established per-file conventions (own `register`/`login`/`uniqueSuffix()` helpers, no shared utils module, `PASSWORD = 'password123'`, `uniqueSuffix()` includes `Math.random()`)
+
+**Given** the full e2e suite (`npm run test:e2e:docker`), **When** run after deleting the three source files, **Then** the suite is green and the total test count matches the pre-migration baseline
+
+---
+
+### Story 8.2: Add GitHub Actions CI for the E2E Gate
+
+As a maintainer,
+I want a GitHub Actions workflow that runs the full Playwright suite on every pull request,
+So that the axe gate is infrastructure-enforced and a PR can never merge with a WCAG AA violation or a broken e2e test.
+
+**Acceptance Criteria:**
+
+**Given** a pull request targeting `main`, **When** the PR is opened or updated, **Then** `.github/workflows/e2e.yml` triggers automatically
+
+**Given** the workflow runs, **Then** it builds a production Next.js bundle (`next build`), starts the app (`next start`), runs `playwright test` against the running app, and uses a Postgres service container so the full stack is available (no Docker-in-Docker required)
+
+**Given** all tests pass and no axe violations are detected, **Then** the required status check passes and the PR is unblocked for merge
+
+**Given** any test fails or any axe violation is detected, **Then** the job exits non-zero, the required status check fails, and the PR is blocked from merging
+
+**Given** the workflow, **Then** Playwright test results (including failure screenshots and traces under `test-results/`) are uploaded as a job artifact so failures are diagnosable without re-running locally
+
+**Given** the workflow file, **Then** `node_modules` and the Next.js build are cached (keyed to `package-lock.json` and relevant source hash respectively) to reduce wall-clock time on repeat runs
+
+---
+
+### Story 8.3: Add Mandatory Accessibility Task to BMad Story Template
+
+As a developer implementing a story that introduces new UI,
+I want the BMad dev-story agent to always include a mandatory accessibility task,
+So that axe scans, keyboard assertions, and ARIA checks are built into every story from the start — not retrofitted in a separate sweep.
+
+**Acceptance Criteria:**
+
+**Given** `_bmad/custom/bmad-dev-story.toml` is updated, **When** the dev-story agent implements a story that introduces new UI (new pages, routes, interactive components, or new conditional states), **Then** the story's Tasks/Subtasks section includes an explicit accessibility task that must be fully checked before status moves to `review`
+
+**Given** the mandatory accessibility task, **Then** it requires: an axe scan (`AxeBuilder`) for each new route or conditional state; behavioral assertions for each new interactive element (visible focus indicator, keyboard operability, ARIA label, colour-not-alone); and where SSE-driven updates are introduced, an `aria-live` region is verified or added
+
+**Given** a story that introduces no UI (pure service layer, database schema, scripts), **Then** the accessibility task is omitted — the rule applies only to stories with new user-facing surfaces
+
+**Given** the rule is added to `persistent_facts` in the dev-story template override, **When** the `bmad-dev-story` skill activates, **Then** the agent applies it without requiring an explicit user prompt
 
 ---
