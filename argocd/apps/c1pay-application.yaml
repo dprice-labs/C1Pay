@@ -2,23 +2,26 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: c1pay
-  namespace: argocd                    # ── namespace where ArgoCD is installed
+  namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: |
+      c1pay=c1pay-ecr-account.dkr.ecr.REGION.amazonaws.com/c1pay:latest
 spec:
   project: default
 
   source:
-    repoURL:    https://github.com/<org>/<repo>.git   # ── replace with your repo
-    targetRevision: main                            # ── branch / tag / SHA to track
-    path: argocd/base                                  # ── directory containing k8s manifests
+    repoURL:    https://github.com/ORG/c1pay.git       # replace with your org/repo
+    targetRevision: dsilva                              # branch tracking the dsilva deployment
+    path: argocd/base                                 # directory containing k8s manifests
 
   destination:
-    server:    https://kubernetes.default.svc            # ── in-cluster API server
-    namespace: c1pay                                   # ── target k8s namespace (created by namespace.yaml)
+    server:    https://kubernetes.default.svc         # in-cluster API server
+    namespace: c1pay                                  # target k8s namespace
 
   syncPolicy:
     automated:
-      prune: true                        # delete resources not in the repo
-      selfHeal: true                     # auto-reconcile on manual drift
+      prune: true                                     # delete resources not in the repo
+      selfHeal: true                                  # auto-reconcile on manual drift
     retry:
       limit: 5
       backoff:

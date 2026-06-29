@@ -1,0 +1,75 @@
+# ──────────────────────────────────────────────────────────────
+# c1pay — default values (production-ready)
+# ──────────────────────────────────────────────────────────────
+
+replicaCount: 2
+
+image:
+  repository: c1pay-ecr-account.dkr.ecr.us-east-1.amazonaws.com/c1pay
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443},{"HTTP":80}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: ""  # replace or use cert-manager
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: c1pay.yourdomain.com   # replace with your domain
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: c1pay-tls
+      hosts:
+        - c1pay.yourdomain.com
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+health:
+  liveness:
+    path: /health
+    port: 3000
+    initialDelaySeconds: 20
+    periodSeconds: 15
+  readiness:
+    path: /health
+    port: 3000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+
+# Set secret values via --set or values-production.yaml:
+#   jwtSecret=<long-random-string>
+#   databaseUrl=postgresql://...
+secrets: {}
+
+# Dev options
+postgresql:
+  enabled: false  # set to true for dev/staging only (not production)
+  auth:
+    username: c1pay
+    password: c1pay  # CHANGE ME
+    database: c1pay

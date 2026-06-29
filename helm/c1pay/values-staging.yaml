@@ -1,0 +1,48 @@
+# ──────────────────────────────────────────────────────────────
+# c1pay — staging environment (pre-prod gate)
+# ──────────────────────────────────────────────────────────────
+
+# Staging gets its own namespace (deployed with --namespace flag):
+#   helm upgrade --install c1pay-staging helm/c1pay \
+#     --namespace=c1pay-staging --create-namespace \
+#     -f helm/c1pay/values.yaml \
+#     -f helm/c1pay/values-staging.yaml
+
+replicaCount: 1                              # staging runs single instance
+
+image:
+  repository: c1pay-ecr-account.dkr.ecr.us-east-1.amazonaws.com/c1pay
+  tag: "staging-latest"                       # deploy main branch to staging
+  pullPolicy: Always                           # always pull the latest
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false                               # unnecessary for staging
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ops: '[{"HTTPS":443}]'
+  hosts:
+    - host: staging.c1pay.yourdomain.com      # replace with your staging domain
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Staging can use the in-cluster postgres for easier dev workflow
+postgresql:
+  enabled: true
+  auth:
+    username: c1pay
+    password: changeme-staging                # CHANGE ME
+    database: c1pay-staging

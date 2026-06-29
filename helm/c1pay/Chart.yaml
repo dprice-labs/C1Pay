@@ -1,0 +1,11 @@
+apiVersion: v2
+name: c1pay
+description: C1Pay — real-time payment and transfer platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: postgresql
+    version: 15.x
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled

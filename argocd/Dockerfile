@@ -26,8 +26,13 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/.next      ./.next
 COPY --from=builder /app/public      ./public
-COPY --from=builder /app/src         ./src
+
+# .next/static — CSS bundles and static assets needed at runtime
+COPY --from=builder /app/.next/static ./.next/static
+# .next/package.json — contains the Next.js build ID
+COPY --from=builder /app/.next/package.json ./.next/package.json
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+# Next.js 15+ ESM output requires --experimental-vm-modules for node runtime
+CMD ["node", "--experimental-vm-modules", ".next/server/server.mjs"]
