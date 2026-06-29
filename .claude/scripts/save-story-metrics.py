@@ -4,7 +4,7 @@ Stop hook: reads .claude/story-session.json to find the active story and phase,
 then finds the most recent session metadata to extract token counts and duration,
 and writes them into the story file's Session Metrics section.
 
-Usage: python3 .claude/scripts/save-story-metrics.py [--dry-run] [--commit]
+Usage: python .claude/scripts/save-story-metrics.py [--dry-run] [--commit]
          [--project-root <path>]
 
 Environment:

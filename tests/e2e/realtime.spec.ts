@@ -76,3 +76,90 @@ test('recipient balance updates live when money is sent', async ({ browser }) =>
     await ctxB.close()
   }
 })
+
+test('request → pay updates inbox badge and balance live', async ({ browser }) => {
+  // Random suffix: tests/e2e runs fullyParallel — avoid collisions across workers.
+  const suffix = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`
+  const sender = `e2e_rqt_sender_${suffix}`
+  const recipient = `e2e_rqt_recipient_${suffix}`
+
+  const ctxA = await browser.newContext()
+  const ctxB = await browser.newContext()
+  const pageA = await ctxA.newPage()
+  const pageB = await ctxB.newPage()
+
+  try {
+    await register(pageA, sender)
+    await register(pageB, recipient)
+    await login(pageA, sender)
+
+    // Establish B's SSE connection BEFORE A creates the request. The in-memory emitter
+    // has no replay: REQUEST_RECEIVED emitted before B's stream is registered server-side
+    // is permanently lost. Set the waiter up before the navigation that opens the stream.
+    const bSseRegistered = pageB.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/sse',
+      { timeout: 15_000 },
+    )
+    await login(pageB, recipient)
+    await bSseRegistered
+
+    // Both start at $1,000.00.
+    await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
+    await expect(pageB.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
+
+    // B navigates to /inbox (client-side navigation — SSE connection stays open).
+    // Inbox page re-requests /api/sse; wait for that registration before A sends.
+    const bInboxSseReady = pageB.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/sse',
+      { timeout: 15_000 },
+    )
+    await pageB.goto('/inbox')
+    await bInboxSseReady
+    await expect(pageB.getByRole('heading', { name: 'Inbox' })).toBeVisible()
+    // Badge starts at 0 — no pending requests yet.
+    await expect(pageB.getByLabel(/pending/)).toContainText('0')
+
+    // --- A creates a request via the 3-step UI ---
+    await pageA.goto('/request')
+    await expect(pageA.getByRole('heading', { name: 'Step 1 of 3' })).toBeVisible()
+
+    await pageA.getByLabel('Search for a recipient by username').fill(recipient)
+    await expect(pageA.getByRole('option').filter({ hasText: recipient })).toBeVisible()
+    await pageA.getByRole('option').filter({ hasText: recipient }).click()
+
+    await expect(pageA.getByRole('heading', { name: 'Step 2 of 3' })).toBeVisible()
+    await pageA.getByLabel('Amount (USD)').fill('10')
+    await pageA.getByLabel('Note (optional)').fill('lunch')
+    await pageA.getByRole('button', { name: 'Continue' }).click()
+
+    await expect(pageA.getByRole('heading', { name: 'Step 3 of 3' })).toBeVisible()
+    await expect(pageA.getByText(sender)).toBeVisible()
+    await expect(pageA.getByText('$10.00')).toBeVisible()
+    await expect(pageA.getByText('lunch')).toBeVisible()
+    await pageA.getByRole('button', { name: 'Confirm & Request' }).click()
+    await expect(pageA).toHaveURL('/')
+
+    // A's balance is unchanged — no funds move until the recipient pays.
+    await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
+
+    // AC #2: B's inbox badge increments live via SSE REQUEST_RECEIVED — B was already
+    // connected before A created the request, so this exercises the real live-push path.
+    await expect(pageB.getByLabel(/pending/)).toContainText('1')
+    await expect(pageB.getByText(sender)).toBeVisible()
+
+    // --- B pays the request ---
+    const payBtn = pageB.getByRole('button', { name: 'Pay' }).first()
+    await expect(payBtn).toBeEnabled()
+    await payBtn.click()
+    await expect(pageB).toHaveURL('/')
+
+    // AC #4: A receives BALANCE_UPDATED live — requester gains $10, balance rises to $1,010.
+    await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$1,010\.00/)
+
+    // B's inbox badge decrements (REQUEST_RESOLVED fired — request no longer pending).
+    await expect(pageB.getByLabel(/pending/)).toContainText('0')
+  } finally {
+    await ctxA.close()
+    await ctxB.close()
+  }
+})

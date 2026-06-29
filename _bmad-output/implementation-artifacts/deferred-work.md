@@ -128,6 +128,10 @@
 - ~~**Test-infra: unmigrated DB → false timeout**~~ — **RESOLVED (2026-06-24):** added `tests/e2e/global-setup.ts` (wired via `playwright.config.ts`) that runs `npm run db:migrate` before any e2e spec starts; migration failures now surface immediately rather than cascading into timeouts.
 - ~~**No account teardown**~~ — **RESOLVED (2026-06-24):** added `tests/e2e/global-teardown.ts` that deletes all `e2e_%` accounts after the suite completes, covering the full e2e suite (not just the a11y spec).
 
+## Deferred from: code review of 4-5-real-time-inbox-and-resolution-updates (2026-06-29)
+
+- **REQUEST_RESOLVED to requester on pay is a no-op** (`src/hooks/use-sse.ts`): `setPendingCount(Math.max(0, pendingCount - 1))` — requester's `pendingCount` is 0 (no incoming requests), so the decrement is always a no-op. The requester gets `BALANCE_UPDATED` (correct) but `REQUEST_RESOLVED` has no meaningful client-side effect. Pre-existing gap in the hook's handling of this event type for the requester role; the event is still emitted server-side per AC#4.
+
 ## Deferred from: code review of 4-2-inbox-and-pending-request-display (2026-06-24)
 
 - **`dateFmt` hardcoded to `en-US`** (`src/app/(protected)/inbox/RequestCard.tsx:6`): pre-existing project-wide pattern from `TransactionRow`; all users see US date format regardless of browser locale. Address in a locale/i18n pass.
