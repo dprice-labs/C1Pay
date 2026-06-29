@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-29  # 4.5 code review patches applied; story back to review
+last_updated: 2026-06-29  # epic-8 planning artifacts drafted
 project: C1Pay
 
 
@@ -102,3 +102,10 @@ development_status:
   7-1-architectural-decision-records: backlog
   7-2-concept-docs-for-demonstrated-practices: backlog
   epic-7-retrospective: optional
+
+  # ── Epic 8: Accessibility Testing Restructure ────────────────────────────────
+  epic-8: backlog
+  8-1-migrate-accessibility-coverage-into-feature-spec-files: backlog
+  8-2-add-github-actions-ci-for-the-e2e-gate: backlog
+  8-3-add-mandatory-accessibility-task-to-bmad-story-template: backlog
+  epic-8-retrospective: optional
