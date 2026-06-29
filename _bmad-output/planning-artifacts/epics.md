@@ -935,3 +935,4 @@ So that axe scans, keyboard assertions, and ARIA checks are built into every sto
 **Given** the rule is added to `persistent_facts` in the dev-story template override, **When** the `bmad-dev-story` skill activates, **Then** the agent applies it without requiring an explicit user prompt
 
 ---
+
