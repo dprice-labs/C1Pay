@@ -21,7 +21,7 @@ eksctl create cluster \
   --managed \
   --ssh-access \
   --with-oidc \
-  --alb-ingress-access \
+
   --tags "app=c1pay,env=production"
 
 echo "Cluster created. Run:"

@@ -4,8 +4,8 @@
 
 ```
                     ┌──────────────────────┐
-                    │  AWS Application     │
-                    │  Load Balancer       │
+                    │  Traefik Ingress     │
+                    │  (Mesh / Edge Router)│
                     └──────────┬───────────┘
                                │ HTTPS (TLS via cert-manager)
                     ┌──────────▼───────────┐
@@ -24,7 +24,7 @@
 
 - **ArgoCD** watches `argocd/base/` in the repo and syncs K8s resources
 - **ImageUpdater** annotation on the Application CRD pushes new images to ECR → ArgoCD picks up image changes automatically
-- **Ingress** via AWS ALB Controller with HTTPS termination (cert-manager + Let's Encrypt)
+- **Ingress** via Traefik v2 with HTTPS termination (cert-manager + Let's Encrypt)
 
 ## Prerequisites
 
@@ -49,8 +49,12 @@ chmod +x infrastructure/*.sh
 # 1. Create EKS cluster (takes ~20 min)
 infrastructure/create-eks.sh c1pay-prod us-east-1
 
-# 2. Attach ALB Ingress Controller and create the load balancer
-infrastructure/create-alb.sh c1pay-prod us-east-1
+# 2. Install Traefik as the ingress controller
+helm repo add traefik https://traefik.github.io/charts
+helm install traefik traefik/traefik \
+  --namespace=traefik --create-namespace \
+  --set metrics.prometheus=true \
+  --set logs.general.level=INFO
 ```
 
 ## Secrets management
@@ -167,7 +171,7 @@ spec:
     solvers:
       - http01:
           ingress:
-            class: alb
+            class: traefik
 ```
 
 ## Monitoring & Health
@@ -189,4 +193,4 @@ kubectl logs -n c1pay -f <pod>         # live logs
 infrastructure/delete-eks.sh c1pay-prod us-east-1
 ```
 
-This removes the EKS cluster, ALB, and all associated resources. **Data in RDS is preserved** (manual backup recommended).
+This removes the EKS cluster, Traefik ingress, and all associated resources. **Data in RDS is preserved** (manual backup recommended).

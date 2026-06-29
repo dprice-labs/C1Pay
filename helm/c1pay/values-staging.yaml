@@ -28,11 +28,9 @@ autoscaling:
 
 ingress:
   enabled: true
+  className: traefik
   annotations:
-    kubernetes.io/ingress.class: alb
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ops: '[{"HTTPS":443}]'
+    traefik.ingress.kubernetes.io/router.entrypoints: web
   hosts:
     - host: staging.c1pay.yourdomain.com      # replace with your staging domain
       paths:

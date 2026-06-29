@@ -3,16 +3,13 @@ kind: Application
 metadata:
   name: c1pay
   namespace: argocd
-  annotations:
-    argocd-image-updater.argoproj.io/image-list: |
-      c1pay=c1pay-ecr-account.dkr.ecr.REGION.amazonaws.com/c1pay:latest
 spec:
   project: default
 
   source:
-    repoURL:    https://github.com/ORG/c1pay.git       # replace with your org/repo
+    repoURL:    https://github.com/dprice-labs/C1Pay.git
     targetRevision: dsilva                              # branch tracking the dsilva deployment
-    path: argocd/base                                 # directory containing k8s manifests
+    path: argocd/base                                 # directory containing k8s manifests (ArgoCD recurses:)
 
   destination:
     server:    https://kubernetes.default.svc         # in-cluster API server

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# delete-eks.sh — Tear down an EKS cluster and ALB (DANGER: destructive)
+# delete-eks.sh — Tear down an EKS cluster and Traefik ingress (DANGER: destructive)
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -11,9 +11,9 @@ echo "WARNING: This will DELETE cluster '${CLUSTER_NAME}' and all resources."
 read -rp "Type '${CLUSTER_NAME}' to confirm: " confirm
 [[ "${confirm}" == "${CLUSTER_NAME}" ]] || { echo "Aborted."; exit 1; }
 
-# Remove ingress before the cluster (ALB must exist before nodes/cluster)
-kubectl delete svc aws-load-balancer-controller -n kube-system --ignore-not-found || true
-kubectl delete deployment/aws-load-balancer-controller -n kube-system --ignore-not-found || true
+# Remove Traefik ingress before the cluster (ingress controllers block cluster teardown)
+helm uninstall traefik -n traefik --no-history 2>/dev/null || true
+kubectl delete namespace traefik --ignore-not-found || true
 
 # Detach VPC CNI addon (must be detached before removing the cluster addon)
 eksctl delete addon \

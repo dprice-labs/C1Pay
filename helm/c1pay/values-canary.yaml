@@ -28,25 +28,18 @@ autoscaling:
 
 ingress:
   enabled: true
+  className: traefik
   annotations:
-    kubernetes.io/ingress.class: alb
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    traefik.ingress.kubernetes.io/router.entrypoints: web
   hosts:
     - host: c1pay.yourdomain.com              # same domain as production
       paths:
         - path: /
           pathType: Prefix
-  tls:
-    - secretName: c1pay-tls
-      hosts:
-        - c1pay.yourdomain.com
 
-# Canary uses weighted backend routing via ALB annotations:
-# The actual traffic split is configured on the ALB controller with
-# alb.ingress.kubernetes.io/actions.weighted-routing for path-based rules,
-# or by using external DNS + ALB weight rules after canary passes.
+# Canary uses Traefik middlewares for traffic splitting:
+# Configure via Middleware resources with SpecServerStrategies or
+# use WeightedRoundRobin in the Traefik dashboard for gradual rollout.
 serviceAccount:
   name: c1pay-canary
 

@@ -4,19 +4,10 @@ metadata:
   name: c1pay-ingress
   namespace: c1pay
   annotations:
-    kubernetes.io/ingress.class: alb
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443},{"HTTP":80}]'
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:REGION:ACCOUNT:certificate/CERT_ID   # replace
-    alb.ingress.kubernetes.io/manage-shared-policies: "true"
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Traefik v2 — HTTP (no TLS for now)
+    traefik.ingress.kubernetes.io/router.entrypoints: web
 spec:
-  tls:
-    - hosts:
-        - c1pay.yourdomain.com      # replace with your domain
-      secretName: c1pay-tls
+  ingressClassName: traefik
   defaultBackend:
     service:
       name: c1pay
