@@ -66,7 +66,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
-          docker build -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -f argocd/Dockerfile .
+          docker build --build-arg DATABASE_URL="" -t ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} -f argocd/Dockerfile .
           docker push ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
 
       - name: Update image in K8s manifests

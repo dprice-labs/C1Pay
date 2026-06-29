@@ -1,7 +1,10 @@
 # ── Builder ────────────────────────────────────────────────────────
+ARG DATABASE_URL=""
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+
+ENV DATABASE_URL=${DATABASE_URL}
 
 # Install dependencies first (leverages Docker layer caching)
 COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* .npmrc .npmrc.local ./
