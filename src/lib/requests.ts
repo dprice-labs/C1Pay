@@ -75,12 +75,12 @@ export async function createRequest(
         void emit(recipientId, {
           type: 'REQUEST_RECEIVED',
           data: { requestId: inserted.id, fromUsername: row.username, amountCents: inserted.amountCents, note: inserted.note ?? undefined },
-        }).catch((err) => { log.warn('REQUEST_RECEIVED emit failed', { requestId: inserted.id, err }) })
+        }).catch((err) => { log.warn(`REQUEST_RECEIVED emit failed requestId=${inserted.id} err=${err}`) })
       } else {
-        log.warn('createRequest: requester username not found for SSE emit', { requesterId })
+        log.warn(`createRequest: requester username not found for SSE emit requesterId=${requesterId}`)
       }
     })
-    .catch((err) => { log.warn('createRequest: username lookup for SSE emit failed', { requesterId, err }) })
+    .catch((err) => { log.warn(`createRequest: username lookup for SSE emit failed requesterId=${requesterId} err=${err}`) })
 
   return inserted
 }

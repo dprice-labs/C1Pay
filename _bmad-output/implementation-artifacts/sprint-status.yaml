@@ -1,5 +1,5 @@
 # generated: 2026-06-01
-# last_updated: 2026-06-03
+# last_updated: 2026-06-29
 # project: C1Pay
 
 # project_key: NOKEY
@@ -36,9 +36,8 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-29  # epic-8 planning artifacts drafted
+last_updated: 2026-06-29  # 6-5 → review; 34/34 e2e green; epic-8 planning drafted
 project: C1Pay
-
 
 project_key: NOKEY
 tracking_system: file-system
@@ -46,7 +45,7 @@ story_location: _bmad-output/implementation-artifacts
 
 development_status:
   # ── Epic 1: Foundation & Authentication ──────────────────────────────────────
-  epic-1: in-progress
+  epic-1: done
   1-1-project-scaffold-and-infrastructure: done
   1-2-database-foundation: done
   1-3-user-registration: done
@@ -55,11 +54,11 @@ development_status:
   epic-1-retrospective: optional
 
   # ── Epic 2: Home Screen & Real-Time Foundation ───────────────────────────────
-  epic-2: in-progress
+  epic-2: done
   2-1-protected-layout-and-zustand-foundation: done
   2-2-home-screen-ui: done
   2-3-sse-connection-and-real-time-updates: done
-  2-4-username-in-top-navbar: review  # GH #39
+  2-4-username-in-top-navbar: done  # GH #40 merged
   epic-2-retrospective: optional
 
   # ── Epic 3: Send Money & Transaction History ──────────────────────────────────
@@ -71,16 +70,16 @@ development_status:
   epic-3-retrospective: optional
 
   # ── Epic 4: Request Flow & State Machine ──────────────────────────────────────
-  epic-4: in-progress
+  epic-4: done
   4-1-requests-schema-and-create-request: done
   4-2-inbox-and-pending-request-display: done
   4-3-pay-and-decline-a-request: done
   4-4-cancel-an-outgoing-request: done
-  4-5-real-time-inbox-and-resolution-updates: review
+  4-5-real-time-inbox-and-resolution-updates: done  # GH #43 merged
   epic-4-retrospective: optional
 
   # ── Epic 5: Batch Administration ─────────────────────────────────────────────
-  epic-5: in-progress
+  epic-5: done
   5-1-batch-create-test-accounts: done
   5-2-reset-test-accounts: done
   epic-5-retrospective: optional
@@ -91,7 +90,7 @@ development_status:
   6-2-keyboard-first-navigation-across-core-flows: done
   6-3-responsive-layout-mobile-tablet-desktop: done
   6-4-automated-wcag-aa-audit-gate: done
-  6-5-post-epic-4-accessibility-responsive-verification-sweep: backlog  # BLOCKED on Epic 4 (4.3/4.4/4.5) — verification net; flip to ready-for-dev once Epic 4 is done
+  6-5-post-epic-4-accessibility-responsive-verification-sweep: review
   epic-6-retrospective: optional
 
   # ── Bug Fixes ────────────────────────────────────────────────────────────────
