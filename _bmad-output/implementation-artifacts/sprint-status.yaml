@@ -36,7 +36,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-01
-last_updated: 2026-06-26  # 2.4 merged GH#40, 4.4 merged GH#42, sprint-status synced
+last_updated: 2026-06-29  # 4.5 code review patches applied; story back to review
 project: C1Pay
 
 
@@ -76,7 +76,7 @@ development_status:
   4-2-inbox-and-pending-request-display: done
   4-3-pay-and-decline-a-request: done
   4-4-cancel-an-outgoing-request: done
-  4-5-real-time-inbox-and-resolution-updates: done
+  4-5-real-time-inbox-and-resolution-updates: review
   epic-4-retrospective: optional
 
   # ── Epic 5: Batch Administration ─────────────────────────────────────────────

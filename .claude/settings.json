@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/scripts/save-story-metrics.py"
+            "command": "python3 .claude/scripts/save-story-metrics.py"
           }
         ]
       }

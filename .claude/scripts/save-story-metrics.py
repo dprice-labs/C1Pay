@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Stop hook: reads .claude/story-session.json to find the active story and phase,
 then finds the most recent session metadata to extract token counts and duration,

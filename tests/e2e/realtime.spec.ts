@@ -89,34 +89,51 @@ test('request → pay updates inbox badge and balance live', async ({ browser })
   const pageB = await ctxB.newPage()
 
   try {
-    // --- Register + login both users ---
     await register(pageA, sender)
     await register(pageB, recipient)
     await login(pageA, sender)
-    await login(pageB, recipient)
 
-    // Both start at $1,000.00 on home page.
+    // Establish B's SSE connection BEFORE A creates the request. The in-memory emitter
+    // has no replay: REQUEST_RECEIVED emitted before B's stream is registered server-side
+    // is permanently lost. Set the waiter up before the navigation that opens the stream.
+    const bSseRegistered = pageB.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/sse',
+      { timeout: 15_000 },
+    )
+    await login(pageB, recipient)
+    await bSseRegistered
+
+    // Both start at $1,000.00.
     await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
     await expect(pageB.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
 
-    // --- A navigates to /request and creates a request via the 3-step UI ---
+    // B navigates to /inbox (client-side navigation — SSE connection stays open).
+    // Inbox page re-requests /api/sse; wait for that registration before A sends.
+    const bInboxSseReady = pageB.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/sse',
+      { timeout: 15_000 },
+    )
+    await pageB.goto('/inbox')
+    await bInboxSseReady
+    await expect(pageB.getByRole('heading', { name: 'Inbox' })).toBeVisible()
+    // Badge starts at 0 — no pending requests yet.
+    await expect(pageB.getByLabel(/pending/)).toContainText('0')
+
+    // --- A creates a request via the 3-step UI ---
     await pageA.goto('/request')
     await expect(pageA.getByRole('heading', { name: 'Step 1 of 3' })).toBeVisible()
 
-    // Step 1: select recipient
     await pageA.getByLabel('Search for a recipient by username').fill(recipient)
     await expect(pageA.getByRole('option').filter({ hasText: recipient })).toBeVisible()
     await pageA.getByRole('option').filter({ hasText: recipient }).click()
 
-    // Step 2: enter amount (10 USD = 1000 cents)
     await expect(pageA.getByRole('heading', { name: 'Step 2 of 3' })).toBeVisible()
     await pageA.getByLabel('Amount (USD)').fill('10')
     await pageA.getByLabel('Note (optional)').fill('lunch')
     await pageA.getByRole('button', { name: 'Continue' }).click()
 
-    // Step 3: confirm
     await expect(pageA.getByRole('heading', { name: 'Step 3 of 3' })).toBeVisible()
-    await expect(pageA.getByText(sender)).toBeVisible() // shows sender username on confirmation card
+    await expect(pageA.getByText(sender)).toBeVisible()
     await expect(pageA.getByText('$10.00')).toBeVisible()
     await expect(pageA.getByText('lunch')).toBeVisible()
     await pageA.getByRole('button', { name: 'Confirm & Request' }).click()
@@ -125,37 +142,21 @@ test('request → pay updates inbox badge and balance live', async ({ browser })
     // A's balance is unchanged — no funds move until the recipient pays.
     await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
 
-    // --- Set up B's SSE guard BEFORE events can fire ---
-    // The in-memory emitter has no replay; an event emitted before B registers would be lost.
-    // waitForResponse on /api/sse proves the stream connection is established server-side.
-    const bSseRegistered = pageB.waitForResponse(
-      (r) => new URL(r.url()).pathname === '/api/sse',
-      { timeout: 15_000 },
-    )
-    await pageB.goto('/inbox')
-    await bSseRegistered
-
-    // B's balance is unchanged at $1,000.00 — pending request received but not yet paid.
-    await expect(pageB.getByRole('heading', { level: 1 })).toHaveText(/\$1,000\.00/)
-
-    // AC #2: B's inbox badge increments live when REQUEST_RECEIVED arrives.
+    // AC #2: B's inbox badge increments live via SSE REQUEST_RECEIVED — B was already
+    // connected before A created the request, so this exercises the real live-push path.
     await expect(pageB.getByLabel(/pending/)).toContainText('1')
+    await expect(pageB.getByText(sender)).toBeVisible()
 
-    // --- B navigates to /inbox and pays the request ---
-    await expect(pageB.getByRole('heading', { name: 'Inbox' })).toBeVisible()
-    await expect(pageB.getByText(sender)).toBeVisible() // sender's username appears as requester in card
-
-    // Click Pay on the request card — RequestCard has a Pay button per item.
+    // --- B pays the request ---
     const payBtn = pageB.getByRole('button', { name: 'Pay' }).first()
     await expect(payBtn).toBeEnabled()
     await payBtn.click()
     await expect(pageB).toHaveURL('/')
 
-    // --- AC #4: A receives REQUEST_RESOLVED + BALANCE_UPDATED live ---
-    // Sender's balance drops from $1,000.00 to $990.00 (the requested amount).
-    await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$990\.00/)
+    // AC #4: A receives BALANCE_UPDATED live — requester gains $10, balance rises to $1,010.
+    await expect(pageA.getByRole('heading', { level: 1 })).toHaveText(/\$1,010\.00/)
 
-    // B's inbox badge decrements (REQUEST_RESOLVED fired — request is no longer pending).
+    // B's inbox badge decrements (REQUEST_RESOLVED fired — request no longer pending).
     await expect(pageB.getByLabel(/pending/)).toContainText('0')
   } finally {
     await ctxA.close()

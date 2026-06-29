@@ -2,7 +2,7 @@
 
 **Epic:** Epic 4 (Requests)
 **Story # in EDA:** —
-**Status:** done
+**Status:** review
 
 ## Goal
 
@@ -147,3 +147,13 @@ claude-sonnet-4-6
 
 - `npm run test:integration && npm run test:e2e` all green (focus on `realtime.spec.ts`).
 - Manual: open `/inbox` in two browser contexts, create a request from A→B, observe badge increment on B's view within ~1s; click Pay on B's side, observe balance highlight and badge decrement on A's view.
+
+## Review Findings
+
+_Code review — 2026-06-29. 4 patch, 1 deferred, 4 dismissed._
+
+- [x] [Review][Patch] Wrong balance assertion in e2e test — requester (pageA) receives $10 so should end at `$1,010.00`, not `$990.00` (payer's balance) [`tests/e2e/realtime.spec.ts`]
+- [x] [Review][Patch] E2E test doesn't exercise live SSE for REQUEST_RECEIVED — pageB navigates to `/inbox` after pageA's request is already committed; the SSE event has already fired before B's connection is open, so badge count=1 comes from the HTTP page load, not a live push. Test order must establish B's SSE connection before A creates the request [`tests/e2e/realtime.spec.ts`]
+- [x] [Review][Patch] Silent error suppression in `createRequest` username lookup — both `.catch(() => {})` blocks swallow all errors with no log line; a DB failure silently drops the REQUEST_RECEIVED emit with no trace [`src/lib/requests.ts`]
+- [x] [Review][Patch] `python` shebang regression — changed from `python3` to `python`; on macOS 12+ and many Linux systems `python` is absent or Python 2, breaking the stop hook for developers without a `python→python3` alias [`.claude/scripts/save-story-metrics.py`, `.claude/settings.json`]
+- [x] [Review][Defer] REQUEST_RESOLVED to requester on pay is a no-op — `use-sse.ts` handler does `setPendingCount(max(0, pendingCount - 1))`; requester's `pendingCount` is 0 (they have no incoming requests), so it always resolves to 0; pre-existing gap in client-side handler for this event type [`src/hooks/use-sse.ts`] — deferred, pre-existing
