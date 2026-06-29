@@ -1,10 +1,10 @@
 # ── Builder ────────────────────────────────────────────────────────
-ARG DATABASE_URL=""
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-ENV DATABASE_URL=${DATABASE_URL}
+# Allow build time without a DB (Next.js SSR collects page data eagerly)
+ENV DATABASE_URL="postgresql://localhost:5432/c1pay"
 
 # Install dependencies first (leverages Docker layer caching)
 COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* .npmrc .npmrc.local ./
